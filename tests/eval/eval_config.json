@@ -1,0 +1,43 @@
+{
+  "criteria": {
+    "rubric_based_final_response_quality_v1": {
+      "threshold": 0.7,
+      "judgeModelOptions": {
+        "judgeModel": "gemini-flash-latest",
+        "numSamples": 1
+      },
+      "rubrics": [
+        {
+          "rubricId": "decomposition_fanout",
+          "rubricContent": {
+            "textProperty": "When asked to decompose an amended clause, the response emits multiple distinct atomic obligations whenever the clause encodes distinct (subject, action, deadline, cadence) tuples. A clause that legitimately fans out into N obligations should not be flattened to one."
+          }
+        },
+        {
+          "rubricId": "coverage_honesty",
+          "rubricContent": {
+            "textProperty": "When asked about coverage of an obligation by the bank's existing policy, the response labels coverage as full / partial / missing / stale / contradicts and is willing to return 'missing' when no internal policy addresses the obligation, rather than inventing coverage."
+          }
+        },
+        {
+          "rubricId": "diff_specificity",
+          "rubricContent": {
+            "textProperty": "Suggested edits to policy sections are concrete (current_text and suggested_text both present), preserve the section's tone and numbering, and cite the obligation(s) and source clause they address."
+          }
+        },
+        {
+          "rubricId": "downstream_effects",
+          "rubricContent": {
+            "textProperty": "The judge surfaces non-obvious downstream effects (e.g., ICAAP recalibration, capital plan revision, Pillar 3 disclosure template, RMC standing agenda, training, board reporting cadence) — not only the direct policy edits."
+          }
+        },
+        {
+          "rubricId": "citations",
+          "rubricContent": {
+            "textProperty": "Follow-up Q&A answers cite specific obligation ids (e.g. obl-…) and policy section ids (e.g. POL-…#sN). The agent refuses to invent citations and is willing to say the analysis does not address a question."
+          }
+        }
+      ]
+    }
+  }
+}

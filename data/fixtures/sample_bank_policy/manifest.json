@@ -1,0 +1,31 @@
+{
+  "bank_id": "demo-bank-india",
+  "as_of": "2026-03-31",
+  "note": "Hand-authored bank policy/SOP fixtures. Written against the PRE-amendment version of MD-RBI-CAP-2025 so the demo amendment fans out into edits across all four policies.",
+  "policies": [
+    {
+      "policy_id": "POL-CAP-001",
+      "title": "Capital Adequacy & Buffer Maintenance Policy",
+      "owner_department": "CFO",
+      "file": "POL-CAP-001.md"
+    },
+    {
+      "policy_id": "POL-ICAAP-002",
+      "title": "Internal Capital Adequacy Assessment Process (ICAAP) Policy",
+      "owner_department": "CRO",
+      "file": "POL-ICAAP-002.md"
+    },
+    {
+      "policy_id": "POL-DISC-003",
+      "title": "Pillar 3 Disclosure Policy",
+      "owner_department": "Investor Relations / Finance",
+      "file": "POL-DISC-003.md"
+    },
+    {
+      "policy_id": "POL-RMC-004",
+      "title": "Risk Management Committee Charter",
+      "owner_department": "Board / Company Secretary",
+      "file": "POL-RMC-004.md"
+    }
+  ]
+}

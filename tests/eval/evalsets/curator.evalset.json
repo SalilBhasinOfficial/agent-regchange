@@ -1,0 +1,62 @@
+{
+  "eval_set_id": "curator_v1",
+  "name": "Curator regulatory-change-intelligence eval",
+  "description": "Stage-1 eval cases — thin by design. Each case primes the orchestrator with the fixture amendment AMD-2026-capital-adequacy and probes one node of the 5-step chain. Stage 2 will expand these once the LLM-driven path is wired.",
+  "eval_cases": [
+    {
+      "eval_id": "decompose_fanout",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Decompose clause MD-RBI-CAP-2025#11.5A (the CRCB insertion). I expect this single clause to fan out into at least three atomic obligations covering: maintain CRCB at full level, phase-in transition, and that the buffer sit on top of the CCB."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "map_coverage_missing",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "For the obligation 'maintain a Climate Risk Capital Buffer of 0.25% of RWAs', which internal policy section addresses it today? Be honest if coverage is missing — POL-CAP-001 currently lists only the Capital Conservation Buffer."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "diff_quality",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Draft the suggested edit to POL-ICAAP-002 section 3 (Cadence) to reflect amendment 2 (quarterly ICAAP refresh + immediate-on-material-change). Preserve the section's tone and numbering."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "judge_downstream_effects",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "What downstream effects does this amendment trigger that a junior reviewer would miss? I am looking for: capital plan revision, RMC charter update, Pillar 3 template change, ICAAP stress-book climate scenario, training need."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "qna_followup_citations",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Of the obligations you extracted, which ones have NO internal policy coverage? List by obligation id with citations."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    }
+  ]
+}
