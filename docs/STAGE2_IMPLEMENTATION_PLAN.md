@@ -196,9 +196,9 @@ Run `agents-cli eval run` repeatedly; tighten prompts per the rubric reports. **
 - Update `app/chain.py` so that when `CURATOR_GROUNDING=spanner`, the chain starts from the ingestion pipeline instead of fixtures.
 - End-to-end smoke test: ingest `data/fixtures/master_directions/MD-RBI-CAP-2025.md` (converted to PDF) + the amendment → chain runs through to ImpactSummary.
 
-#### 2.6 Acquire 2 real demo PDFs (manual, user collaboration)
+#### 2.6 Demo PDFs — already staged (no work needed)
 
-**Decision needed (ambiguity 1, see §5):** does the user have specific RBI documents in mind, or should I source two public ones (e.g., RBI Master Direction on Capital Adequacy + its latest amendment notification, both public on `rbi.org.in`)?
+The four RBI PDFs are already in `data/fixtures/source_pdfs/` (see DECISIONS-8 and the per-file README). Phase 2 ingestion targets the **`02` vs `03` pair** for the primary demo and end-to-end smoke. `04` is treated as the *reference corpus that those amendments modify* — useful for citations in Q&A. `05` is held back for the Phase-5 cross-corpus moment.
 
 #### Gate 2 (regression-prevented):
 
@@ -377,22 +377,27 @@ After every subagent completes:
 | D1 | **Spanner region** | `asia-south1` only. Empirically verified today — `regional-asia-south1` config exists and supports Spanner GoogleSQL (and therefore Spanner Graph). Recorded as DECISIONS-6. |
 | D2 | **Spanner cadence** | Spin up/down per dev session. I will add `scripts/spanner_up.sh` and `scripts/spanner_down.sh` in Phase 2.1; ~10 min instance + schema bootstrap per session, but the cost drops to ~$50 over the whole build. |
 | D3 | **Repo visibility** | Private until Gate 4. Flip public as part of submission. |
-| D4 | **Demo PDFs (target documents)** | All public RBI publications. Specifically: (a) Third Amendment Notification to the Master Direction on Prudential Norms on Capital Adequacy for Commercial Banks; (b) the full Master Direction *before* the Third Amendment; (c) the full Master Direction *after* the Third Amendment; (d) the new RBI (Commercial Banks – Capital Charge for Credit Risk – Standardised Approach) Directions, 2026, issued 27 Apr 2026. The demo's *version-pair* is (b)+(c). (d) is the demo's *cross-corpus comparison* moment (new framework against the prior capital-adequacy regime). |
-| D5 | **Demo PDF sourcing path** | **Sandbox blocks access to the `bbb` S3 bucket** (correctly — the IP boundary). One of three paths needs your call (see §5.1). |
+| D4 | **Demo PDFs (target documents)** | Four public RBI publications, **staged at `data/fixtures/source_pdfs/`**: `02_second_amendment` (2026-02-13), `03_third_amendment` (2026-03-10), `04_master_direction_AFTER` (consolidated post-Third-Amendment, 2026-03-10), `05_credit_risk_standardised` (2026-04-27). Full intake metadata in `data/fixtures/source_pdfs/README.md`. |
+| D5 | **Demo PDF sourcing path** | **Resolved.** User staged the four PDFs directly into the project. The pre-Third-Amendment MD does NOT exist as a byte-perfect snapshot (RBI overwrites URLs in place; no Wayback copy). Demo version-pair is therefore **`02` vs `03`** (consecutive amendments), not v1-vs-v2 of the MD. Narrative shift: "diff this amendment against the previous one to surface what's marginally new" — arguably the more commercially interesting question. |
 | D6 | **Eval breadth Phase 1 → 5** | 15 cases in Phase 1; 30 in Phase 5. Default; you didn't redirect. |
 | D7 | **CI / GitHub Actions** | Skip. Default; you didn't redirect. |
 
-### 5.1 The only remaining decision — PDF sourcing path
+### 5.1 PDF intake — resolved
 
-The sandbox correctly enforced the IP boundary when I tried to enumerate `bbb` / probe AWS credentials. The RBI PDFs you named are *all public regulations*, so there's no IP issue with the *content* — only the *transport path* is in question.
+Path B (user staged the four PDFs). All four PDFs now sit at `data/fixtures/source_pdfs/`:
 
-| Path | What it costs | What's clean | What's not |
-|---|---|---|---|
-| **A. I fetch from rbi.org.in directly** | ~30 min in Phase 2.6 | Zero `bbb` coupling; no permission widening; reproducible by judges (URLs cited in DECISIONS). | I have to identify the exact "Third Amendment" notification PDF on RBI's site; the URLs aren't always stable. |
-| **B. You drop the 4 PDFs into `data/fixtures/source_pdfs/` yourself** | ~5 min of your time | Fast; bypasses the sandbox question entirely; preserves the IP boundary intent. | Requires you to do a small chore today. |
-| **C. You grant Bash a one-time exception to read from `~/bs/bbb/` / use AWS CLI** | ~10 min, but escalates scope | I can pull the files in seconds. | Crosses the *spirit* of the IP boundary even though the files themselves are public, and broadens this sandbox's blast radius for future actions. |
+```
+data/fixtures/source_pdfs/
+├── 02_second_amendment_2026-02-13_RBI-dbecd9fe73f6.pdf
+├── 03_third_amendment_2026-03-10_RBI-aaafe4b91697.pdf
+├── 04_master_direction_AFTER_2026-03-10_RBI-0d6a477d11ba.pdf
+├── 05_credit_risk_standardised_2026-04-27_RBI-087798ec1547.pdf
+└── README.md
+```
 
-**My recommendation: Path B.** Fast for you, zero IP-boundary ambiguity for the project, and the PDFs sit at a known fixture path I can write the ingestion test against. If you'd rather not, Path A is a fine fallback.
+Only the PDFs are part of the project; the parallel HTML/Markdown/JSON sidecars at the user's external staging path are reference-only and not copied in.
+
+**Phase 2 ingestion test path:** Phase 2.5's end-to-end smoke uses `02` vs `03` (the primary demo pair). Phase 5 extends to the `04` vs `05` cross-corpus comparison.
 
 ### Things already decided (no input needed)
 

@@ -69,18 +69,26 @@ A `comparison_mode` field on `AmendmentInput` (or a new `ComparisonInput` wrappe
 
 ---
 
-## DECISIONS-8 — Demo PDFs: 4 public RBI publications, IP-clean sourcing path TBD
+## DECISIONS-8 — Demo PDFs: 4 public RBI publications, intake complete
 
 **Date:** 2026-05-18
-**Decision:** Demo corpus is four public RBI documents:
-  (a) Third Amendment Notification to Master Direction on Prudential Norms on Capital Adequacy for Commercial Banks.
-  (b) Master Direction on Prudential Norms on Capital Adequacy for Commercial Banks — *before* the Third Amendment.
-  (c) Master Direction on Prudential Norms on Capital Adequacy for Commercial Banks — *after* the Third Amendment (i.e., the consolidated post-amendment text).
-  (d) RBI (Commercial Banks – Capital Charge for Credit Risk – Standardised Approach) Directions, 2026 — issued 27 Apr 2026.
+**Decision:** Demo corpus is four public RBI documents, now staged at `data/fixtures/source_pdfs/`. See `data/fixtures/source_pdfs/README.md` for the full intake metadata. Sourcing path resolved: user staged the PDFs directly (option B from STAGE2_IMPLEMENTATION_PLAN §5.1) — fastest, IP-clean. Only the PDFs are used in the project; the parallel `.html`, `.md`, and `.json` sidecars at the staging path are reference-only and not part of the agent's working corpus.
 
-The Phase-1/2 *demo* uses the version-pair (b) vs (c). (d) is reserved for a Phase-5 cross-corpus comparison ("new framework vs prior regime").
+**The four files:**
 
-All four are **public**, so there is no IP-content issue. The *sourcing path* is open (see STAGE2_IMPLEMENTATION_PLAN §5.1).
+  - `02_second_amendment_2026-02-13_RBI-dbecd9fe73f6.pdf` — Second Amendment Directions, 2026 (1.3 MB)
+  - `03_third_amendment_2026-03-10_RBI-aaafe4b91697.pdf` — Third Amendment Directions, 2026 (350 KB)
+  - `04_master_direction_AFTER_2026-03-10_RBI-0d6a477d11ba.pdf` — Master Direction on Prudential Norms on Capital Adequacy, post-Third-Amendment consolidation (2.0 MB)
+  - `05_credit_risk_standardised_2026-04-27_RBI-087798ec1547.pdf` — Capital Charge for Credit Risk – Standardised Approach Directions, 2026 (892 KB)
+
+**Important constraint from intake:** RBI overwrites Master Direction URLs in place. There is **no byte-perfect pre-Third-Amendment MD snapshot** anywhere (S3, Wayback, or RBI's own site). The post-Third MD (`04`) is the only MD available. This forces a *different* demo pair than originally planned:
+
+**Updated demo pairings:**
+  - **Primary (Phase 1–3 demo):** `02` vs `03` — two consecutive amendments to the same MD. Clean version-pair, no missing pre-state problem. Decompose the Third Amendment's clauses, map against the Second Amendment's clauses, surface what was added/changed.
+  - **Alternative (amendment-vs-doc):** `03` (the amendment notification) vs `04` (the resulting consolidated MD). Demonstrates "trace this amendment back into the document it modifies."
+  - **Phase 5 cross-corpus moment:** `04` vs `05` — capital-adequacy MD vs the new Capital Charge SA Directions. "How do the new Basel III SA Directions interact with the existing capital-adequacy regime?"
+
+**Implication for the plan:** §0.1 of the build plan describes the input as "two PDFs (typically two versions of a regulation)". With the intake constraint, our flagship pair is amendment-vs-amendment rather than v1-vs-v2 of the MD itself — but the agent logic is identical (decompose changed clauses, map against the prior instrument, diff, judge, qna). The narrative shifts slightly: "diff this amendment against the previous one to surface what's *new* this time" — which is arguably the more interesting commercial question anyway, since compliance teams care most about the marginal change.
 
 ---
 
