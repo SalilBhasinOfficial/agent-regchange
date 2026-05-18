@@ -51,6 +51,39 @@ A `comparison_mode` field on `AmendmentInput` (or a new `ComparisonInput` wrappe
 
 ---
 
+## DECISIONS-6 — Spanner Graph region: `asia-south1` only
+
+**Date:** 2026-05-18
+**Decision:** Spanner Graph is provisioned **only in `asia-south1`**. No fallback to `us-central1`. Verified `regional-asia-south1` instance config is available on `curator-research` via `gcloud spanner instance-configs list`.
+**Why:** User direction. The Indian-residency story is core to the BFSI Track-3 narrative; we accept the risk of having to debug any asia-south1-specific Spanner Graph quirks rather than weaken it.
+**Implication:** If a Spanner-Graph-only feature lands us-only mid-build, we either work around it or surface a hard blocker to the user immediately.
+
+---
+
+## DECISIONS-7 — Spanner provisioning cadence: spin up / spin down per session
+
+**Date:** 2026-05-18
+**Decision:** Do NOT leave a Spanner instance running for the whole build. Provision it at the start of each session, tear it down at session end. Helpers: `scripts/spanner_up.sh` (create instance, create database, apply schema) and `scripts/spanner_down.sh` (delete instance).
+**Why:** Cost discipline — user preference. Estimated total Stage-2 Spanner cost falls from ~$180 to ~$50 across 18 days. The ~10 min per-session bootstrap is acceptable.
+**Implication:** Graph data is ephemeral between sessions. Phase 2 ingestion must therefore be **fast** (target: <2 min per PDF re-ingestion); Phase 3 deploy needs an automatic schema-bootstrap step on Cloud Run cold start.
+
+---
+
+## DECISIONS-8 — Demo PDFs: 4 public RBI publications, IP-clean sourcing path TBD
+
+**Date:** 2026-05-18
+**Decision:** Demo corpus is four public RBI documents:
+  (a) Third Amendment Notification to Master Direction on Prudential Norms on Capital Adequacy for Commercial Banks.
+  (b) Master Direction on Prudential Norms on Capital Adequacy for Commercial Banks — *before* the Third Amendment.
+  (c) Master Direction on Prudential Norms on Capital Adequacy for Commercial Banks — *after* the Third Amendment (i.e., the consolidated post-amendment text).
+  (d) RBI (Commercial Banks – Capital Charge for Credit Risk – Standardised Approach) Directions, 2026 — issued 27 Apr 2026.
+
+The Phase-1/2 *demo* uses the version-pair (b) vs (c). (d) is reserved for a Phase-5 cross-corpus comparison ("new framework vs prior regime").
+
+All four are **public**, so there is no IP-content issue. The *sourcing path* is open (see STAGE2_IMPLEMENTATION_PLAN §5.1).
+
+---
+
 ## DECISIONS-5 — agents-cli installed as a uv tool, version 0.1.3
 
 **Date:** 2026-05-18

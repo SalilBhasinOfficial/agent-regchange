@@ -370,27 +370,42 @@ After every subagent completes:
 
 ---
 
-## 5. Genuinely open questions for you
+## 5. Decisions locked in (sign-off received)
 
-The advisor and the spike resolved most ambiguities; only these still need your call. Each has a recommendation in italics — answer "go with the default" and I start immediately.
+| # | Decision | Choice |
+|---|---|---|
+| D1 | **Spanner region** | `asia-south1` only. Empirically verified today — `regional-asia-south1` config exists and supports Spanner GoogleSQL (and therefore Spanner Graph). Recorded as DECISIONS-6. |
+| D2 | **Spanner cadence** | Spin up/down per dev session. I will add `scripts/spanner_up.sh` and `scripts/spanner_down.sh` in Phase 2.1; ~10 min instance + schema bootstrap per session, but the cost drops to ~$50 over the whole build. |
+| D3 | **Repo visibility** | Private until Gate 4. Flip public as part of submission. |
+| D4 | **Demo PDFs (target documents)** | All public RBI publications. Specifically: (a) Third Amendment Notification to the Master Direction on Prudential Norms on Capital Adequacy for Commercial Banks; (b) the full Master Direction *before* the Third Amendment; (c) the full Master Direction *after* the Third Amendment; (d) the new RBI (Commercial Banks – Capital Charge for Credit Risk – Standardised Approach) Directions, 2026, issued 27 Apr 2026. The demo's *version-pair* is (b)+(c). (d) is the demo's *cross-corpus comparison* moment (new framework against the prior capital-adequacy regime). |
+| D5 | **Demo PDF sourcing path** | **Sandbox blocks access to the `bbb` S3 bucket** (correctly — the IP boundary). One of three paths needs your call (see §5.1). |
+| D6 | **Eval breadth Phase 1 → 5** | 15 cases in Phase 1; 30 in Phase 5. Default; you didn't redirect. |
+| D7 | **CI / GitHub Actions** | Skip. Default; you didn't redirect. |
 
-1. **Demo PDFs (highest priority).** Do you have specific RBI documents in mind (a particular Master Direction + its amendment that resonates with the BFSI audience), or should I source two public ones from `rbi.org.in`? *Default: I source two public ones — likely the **Master Direction – Reserve Bank of India (Credit and Debit Card – Issuance and Conduct) Directions, 2022** + its **2024 amendment** as the version-pair, since both are public and the amendment is clean. We swap if you have better candidates.*
-2. **Spanner Graph region.** `asia-south1` (preferred for the residency story; unconfirmed availability) vs `us-central1` (confirmed, weaker narrative). *Default: try asia-south1; fall back to us-central1 if creation fails. Outcome recorded in DECISIONS-6.*
-3. **Repo public visibility timing.** Public from day 1 (forces discipline; ~2h hygiene cost now) vs public at Gate 4 only (safer for last-minute IP checks). *Default: keep private until Gate 4. Flip public as part of submission.*
-4. **Eval breadth target in Phase 1.** 15 cases (token-cheap, faster iteration) vs 25 (stronger evidence, slower loop). *Default: 15 in Phase 1, expand to 30 in Phase 5.*
-5. **Spanner provisioning cadence.** Leave dev instance up for the build (~$180 over 18 days at 100 PUs) vs spin up/down per work session (cheaper but adds ~10min per session). *Default: leave running, manual teardown when >4h idle. Total cap $200.*
-6. **CI / GitHub Actions.** Skip vs Phase-5 setup. *Default: skip; not graded.*
+### 5.1 The only remaining decision — PDF sourcing path
 
-### Things I'm NOT asking about (already decided per advisor)
+The sandbox correctly enforced the IP boundary when I tried to enumerate `bbb` / probe AWS credentials. The RBI PDFs you named are *all public regulations*, so there's no IP issue with the *content* — only the *transport path* is in question.
 
-- Demo orchestration path: Python chain (deterministic), not ADK delegation. ADK delegation is Phase 5.
+| Path | What it costs | What's clean | What's not |
+|---|---|---|---|
+| **A. I fetch from rbi.org.in directly** | ~30 min in Phase 2.6 | Zero `bbb` coupling; no permission widening; reproducible by judges (URLs cited in DECISIONS). | I have to identify the exact "Third Amendment" notification PDF on RBI's site; the URLs aren't always stable. |
+| **B. You drop the 4 PDFs into `data/fixtures/source_pdfs/` yourself** | ~5 min of your time | Fast; bypasses the sandbox question entirely; preserves the IP boundary intent. | Requires you to do a small chore today. |
+| **C. You grant Bash a one-time exception to read from `~/bs/bbb/` / use AWS CLI** | ~10 min, but escalates scope | I can pull the files in seconds. | Crosses the *spirit* of the IP boundary even though the files themselves are public, and broadens this sandbox's blast radius for future actions. |
+
+**My recommendation: Path B.** Fast for you, zero IP-boundary ambiguity for the project, and the PDFs sit at a known fixture path I can write the ingestion test against. If you'd rather not, Path A is a fine fallback.
+
+### Things already decided (no input needed)
+
+- Demo orchestration: Python chain (deterministic), not ADK delegation. ADK delegation is Phase 5.
 - UI tech: FastAPI + Jinja co-located with A2A on one Cloud Run service.
-- Comparison mode: version-pair only in Phase 1; cross-document Phase 5.
+- Comparison mode: version-pair only in Phase 1; cross-document (D4-d vs D4-c) becomes the Phase-5 cross-corpus moment.
 - Model: `gemini-flash-latest` universally per CLAUDE.md.
 - Subagent monitoring: auto-review after every code-writing subagent.
 - Push to `origin` after each Gate (1/2/3): yes.
 - Runtime: Cloud Run (Track 3 mandate), not Agent Runtime.
 - A2A multi-skill verification: opportunistic Phase 1, not late discovery in Phase 3.
+- LICENSE: Apache 2.0, in place.
+- `output_schema=list[Obligation]`: works against `gemini-flash-latest`, verified today.
 
 ---
 
