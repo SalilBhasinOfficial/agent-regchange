@@ -1,0 +1,20 @@
+# Reserve Bank of India (Commercial Banks - Prudential Norms on Capital Adequacy) Second Amendment Directions, 2026
+
+RBI/2025-26/213 DOR.CRE.REC.404/21-01-002/2025-26
+
+February 13, 2026
+
+Reserve Bank of India (Commercial Banks - Prudential Norms on Capital Adequacy) Second Amendment Directions, 2026
+
+Please refer to Reserve Bank of India (Commercial Banks - Prudential Norms on Capital Adequacy) Directions, 2025 (hereinafter referred to as 'the Directions ').
+
+2. On a review, consequent to the issuance of the Reserve Bank of India (Commercial Banks - Credit Facilities) Amendment Directions, 2026 , and in exercise of the powers conferred by the section 21 and 35A of the Banking Regulation Act, 1949 and all other laws enabling the Reserve Bank of India (hereinafter called the Reserve Bank) in this regard, the Reserve Bank being satisfied that it is necessary and expedient in the public interest so to do, hereby issues the Amendment Directions hereinafter specified.
+
+
+## 3. The Amendment Directions modify paragraph 84(6) in 'Chapter IV - Risk weighted assets (RWAs)' of the Directions as under:
+
+"Issue of irrevocable payment commitment by a bank to clearing corporations of stock exchanges on behalf of its client is a financial guarantee with a CCF of 100 per cent. However, capital shall be maintained only on the exposure reckoned as capital market exposure (CME) in terms of the Reserve Bank of India (Commercial Banks - Concentration Risk Management) Directions, 2025 . Thus, capital is to be maintained on the amount taken for CME and the risk weight shall be 125 per cent thereon."
+
+4. The above amendment shall come into force from the date a bank decides to implement the provisions of the Reserve Bank of India (Commercial Banks - Credit Facilities) Amendment Directions, 2026 or from April 1, 2026, whichever is earlier.
+
+(Vaibhav Chaturvedi) Chief General Manager

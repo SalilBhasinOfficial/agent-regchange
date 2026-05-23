@@ -199,3 +199,9 @@ my_env.tfvars
 # A2A Inspector
 tools/a2a-inspector/
 .secrets/
+
+# Personal documents
+inout/*.jpg
+inout/*.jpeg
+inout/*.png
+docs/context_research/*.jpg

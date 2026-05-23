@@ -1,0 +1,595 @@
+Agenda - Asia-Pacific
+May 14
+Time
+arrow_drop_down
+Title
+8:35 AM  - 8:50 AM  GMT+5:30
+The future of AI: How startups build competitive moats
+As the future of AI takes shape, startups are making big bets on what will matter long-term. Join leading founders for a real conversation about how they’re building moats beyond the model—what decisions paid off, which ones didn’t, and how they’re thinking about architecture, data, cost, and product today.
+link
+Copy link to share session
+event
+Add to calendar
+
+Scott Barneson
+Managing Director
+North America Startups
+Simon Hørup Eskildsen
+Founder & CEO
+Turbopuffer
+Mukund Jha
+Founder & CEO
+Emergent
+Felipe Moreno
+CEO
+Jusbrasil
+youtube_live
+Watch live
+8:50 AM  - 9:05 AM  GMT+5:30
+Startups shipping at scale with Google DeepMind
+In the AI world, your only real moat is iteration speed. Logan Kilpatrick and founders from the front lines share their "recipe" for moving fast without breaking the model. We’ll look at real workflows using Google DeepMind's models, the technical trade-offs of multimodality, and how to stay ahead of the next model release.
+link
+Copy link to share session
+event
+Add to calendar
+
+Logan Kilpatrick
+Group Product Manager
+Google DeepMind
+Michele Catasta
+President & Head of AI
+Replit
+Eno Reyes
+CTO & Co-Founder
+Factory
+Bianca Rangecroft
+Founder & CEO
+Whering
+Jay Wu
+Co-Founder & CTO
+Opus Clip
+9:05 AM  - 9:20 AM  GMT+5:30
+Multimodal startups: Building AI that sees, speaks & creates
+The future of AI is multimodal and generative. Startup founders will discuss how they combine vision, speech, and language with tools like Imagen, Chirp, Veo, Lyria, and Gemini Live to build human-like experiences, prototype fast, scale production, and turn AI-driven creativity into real products.
+link
+Copy link to share session
+event
+Add to calendar
+
+Arthur Soroken
+Co-Founder
+AI Futures Fund & Growth Hacking Lead
+Bin Liu
+VP of Product Engineering
+HeyGen
+Ben Budde
+VP of Revenue
+ElevenLabs
+Matt Rouif
+CEO & Co-Founder
+Photoroom
+9:20 AM  - 9:35 AM  GMT+5:30
+From prompts to production: Startup multi-agent workflows
+Autonomous multi-agent systems are speeding up how startups build and scale. Founders share how they use frameworks like ADK, A2A, and MCP to orchestrate complex workflows, prototype faster, and deliver reliable next-gen AI solutions.
+link
+Copy link to share session
+event
+Add to calendar
+
+Jamie de Guerre
+Senior Director, Outbound Product Management
+Cloud AI
+Akash Sharma
+CEO
+Vellum AI
+Maxim Fateev
+CTO
+Temporal
+George Kichukov
+Field CTO
+GitLab
+9:35 AM  - 10:05 AM  GMT+5:30
+Expert insights: Live Q&A with Google Cloud experts
+Bring your questions and join the conversation. As our experts walk through the highlights, ask anything that comes up and get real-time insights on new launches, AI adoption, and business impact.
+
+link
+Copy link to share session
+event
+Add to calendar
+
+Mirabel Tukiman
+Customer Engineer
+Google Cloud
+Gia Lim
+Customer Engineer, Infrastructure Modernization, Digital Natives
+Google Cloud
+Yuan Liu
+Customer Engineer, Applied & Generative AI
+Google Cloud
+Yazan Mughrabi
+Security Practice Lead
+AuNZ
+10:05 AM  - 10:10 AM  GMT+5:30
+Closing remarks
+link
+Copy link to share session
+event
+Add to calendar
+
+Darren Mowry
+Vice President
+Global Startups
+Welcome & Keynote
+Join Darren Mowry, VP of Global Startups at Google Cloud, as he kicks things off with an exclusive recap of key announcements and innovations directly from the Startup Hub at Google Cloud Next, highlighting the most impactful trends shaping the future of AI.
+5 Minutes
+link
+Copy link to share session
+Darren Mowry
+Vice President
+Global Startups
+
+Agenda - Asia-Pacific
+May 14
+Time
+arrow_drop_down
+Title
+9:05 AM  - 9:20 AM  GMT+5:30
+Multimodal startups: Building AI that sees, speaks & creates
+The future of AI is multimodal and generative. Startup founders will discuss how they combine vision, speech, and language with tools like Imagen, Chirp, Veo, Lyria, and Gemini Live to build human-like experiences, prototype fast, scale production, and turn AI-driven creativity into real products.
+link
+Copy link to share session
+event
+Add to calendar
+
+Arthur Soroken
+Co-Founder
+AI Futures Fund & Growth Hacking Lead
+Bin Liu
+VP of Product Engineering
+HeyGen
+Ben Budde
+VP of Revenue
+ElevenLabs
+Matt Rouif
+CEO & Co-Founder
+Photoroom
+youtube_live
+Watch live
+9:20 AM  - 9:35 AM  GMT+5:30
+From prompts to production: Startup multi-agent workflows
+Autonomous multi-agent systems are speeding up how startups build and scale. Founders share how they use frameworks like ADK, A2A, and MCP to orchestrate complex workflows, prototype faster, and deliver reliable next-gen AI solutions.
+link
+Copy link to share session
+event
+Add to calendar
+
+Jamie de Guerre
+Senior Director, Outbound Product Management
+Cloud AI
+Akash Sharma
+CEO
+Vellum AI
+Maxim Fateev
+CTO
+Temporal
+George Kichukov
+Field CTO
+GitLab
+9:35 AM  - 10:05 AM  GMT+5:30
+Expert insights: Live Q&A with Google Cloud experts
+Bring your questions and join the conversation. As our experts walk through the highlights, ask anything that comes up and get real-time insights on new launches, AI adoption, and business impact.
+
+link
+Copy link to share session
+event
+Add to calendar
+
+Mirabel Tukiman
+Customer Engineer
+Google Cloud
+Gia Lim
+Customer Engineer, Infrastructure Modernization, Digital Natives
+Google Cloud
+Yuan Liu
+Customer Engineer, Applied & Generative AI
+Google Cloud
+Yazan Mughrabi
+Security Practice Lead
+AuNZ
+10:05 AM  - 10:10 AM  GMT+5:30
+Closing remarks
+link
+Copy link to share session
+event
+Add to calendar
+
+Darren Mowry
+Vice President
+Global Startups
+Welcome & Keynote
+Join Darren Mowry, VP of Global Startups at Google Cloud, as he kicks things off with an exclusive recap of key announcements and innovations directly from the Startup Hub at Google Cloud Next, highlighting the most impactful trends shaping the future of AI.
+5 Minutes
+link
+Copy link to share session
+Darren Mowry
+Vice President
+Global Startups
+The future of AI: How startups build competitive moats
+As the future of AI takes shape, startups are making big bets on what will matter long-term. Join leading founders for a real conversation about how they’re building moats beyond the model—what decisions paid off, which ones didn’t, and how they’re thinking about architecture, data, cost, and product today.
+15 Minutes
+link
+Copy link to share session
+Scott Barneson
+Managing Director
+North America Startups
+Simon Hørup Eskildsen
+Founder & CEO
+Turbopuffer
+Mukund Jha
+Founder & CEO
+Emergent
+Felipe Moreno
+CEO
+Jusbrasil
+Startups shipping at scale with Google DeepMind
+In the AI world, your only real moat is iteration speed. Logan Kilpatrick and founders from the front lines share their "recipe" for moving fast without breaking the model. We’ll look at real workflows using Google DeepMind's models, the technical trade-offs of multimodality, and how to stay ahead of the next model release.
+15 Minutes
+link
+Copy link to share session
+Logan Kilpatrick
+Group Product Manager
+Google DeepMind
+Michele Catasta
+President & Head of AI
+Replit
+Eno Reyes
+CTO & Co-Founder
+Factory
+Bianca Rangecroft
+Founder & CEO
+Whering
+Jay Wu
+Co-Founder & CTO
+Opus Clip
+Share
+Google logo
+About Google
+Google products
+Privacy
+Terms
+Code of Conduct
+
+Agenda - Asia-Pacific
+May 14
+Time
+arrow_drop_down
+Title
+9:35 AM  - 10:05 AM  GMT+5:30
+Expert insights: Live Q&A with Google Cloud experts
+Bring your questions and join the conversation. As our experts walk through the highlights, ask anything that comes up and get real-time insights on new launches, AI adoption, and business impact.
+
+link
+Copy link to share session
+event
+Add to calendar
+
+Mirabel Tukiman
+Customer Engineer
+Google Cloud
+Gia Lim
+Customer Engineer, Infrastructure Modernization, Digital Natives
+Google Cloud
+Yuan Liu
+Customer Engineer, Applied & Generative AI
+Google Cloud
+Yazan Mughrabi
+Security Practice Lead
+AuNZ
+Resources
+info
+News from Next 2026
+info
+Future of AI: GenMedia
+info
+Startup School: Agentic AI
+info
+AI Agents Challenge
+info
+Immersion Day w/ Antler
+10:05 AM  - 10:10 AM  GMT+5:30
+Closing remarks
+link
+Copy link to share session
+event
+Add to calendar
+
+Darren Mowry
+Vice President
+Global Startups
+Resources
+info
+News from Next 2026
+info
+Future of AI: GenMedia
+info
+Startup School: Agentic AI
+info
+AI Agents Challenge
+info
+Immersion Day w/ Antler
+Welcome & Keynote
+Join Darren Mowry, VP of Global Startups at Google Cloud, as he kicks things off with an exclusive recap of key announcements and innovations directly from the Startup Hub at Google Cloud Next, highlighting the most impactful trends shaping the future of AI.
+5 Minutes
+link
+Copy link to share session
+Darren Mowry
+Vice President
+Global Startups
+The future of AI: How startups build competitive moats
+As the future of AI takes shape, startups are making big bets on what will matter long-term. Join leading founders for a real conversation about how they’re building moats beyond the model—what decisions paid off, which ones didn’t, and how they’re thinking about architecture, data, cost, and product today.
+15 Minutes
+link
+Copy link to share session
+Scott Barneson
+Managing Director
+North America Startups
+Simon Hørup Eskildsen
+Founder & CEO
+Turbopuffer
+Mukund Jha
+Founder & CEO
+Emergent
+Felipe Moreno
+CEO
+Jusbrasil
+Startups shipping at scale with Google DeepMind
+In the AI world, your only real moat is iteration speed. Logan Kilpatrick and founders from the front lines share their "recipe" for moving fast without breaking the model. We’ll look at real workflows using Google DeepMind's models, the technical trade-offs of multimodality, and how to stay ahead of the next model release.
+15 Minutes
+link
+Copy link to share session
+Logan Kilpatrick
+Group Product Manager
+Google DeepMind
+Michele Catasta
+President & Head of AI
+Replit
+Eno Reyes
+CTO & Co-Founder
+Factory
+Bianca Rangecroft
+Founder & CEO
+Whering
+Jay Wu
+Co-Founder & CTO
+Opus Clip
+Multimodal startups: Building AI that sees, speaks & creates
+The future of AI is multimodal and generative. Startup founders will discuss how they combine vision, speech, and language with tools like Imagen, Chirp, Veo, Lyria, and Gemini Live to build human-like experiences, prototype fast, scale production, and turn AI-driven creativity into real products.
+15 Minutes
+link
+Copy link to share session
+Arthur Soroken
+Co-Founder
+AI Futures Fund & Growth Hacking Lead
+Bin Liu
+VP of Product Engineering
+HeyGen
+Ben Budde
+VP of Revenue
+ElevenLabs
+Matt Rouif
+CEO & Co-Founder
+Photoroom
+From prompts to production: Startup multi-agent workflows
+Autonomous multi-agent systems are speeding up how startups build and scale. Founders share how they use frameworks like ADK, A2A, and MCP to orchestrate complex workflows, prototype faster, and deliver reliable next-gen AI solutions.
+15 Minutes
+link
+Copy link to share session
+Jamie de Guerre
+Senior Director, Outbound Product Management
+Cloud AI
+Akash Sharma
+CEO
+Vellum AI
+Maxim Fateev
+CTO
+Temporal
+George Kichukov
+Field CTO
+GitLab
+Resources
+info
+News from Next 2026
+info
+Future of AI: GenMedia
+info
+Startup School: Agentic AI
+info
+AI Agents Challenge
+info
+Immersion Day w/ Antler
+
+
+Time
+Title
+Welcome & Keynote
+Join Darren Mowry, VP of Global Startups at Google Cloud, as he kicks things off with an exclusive recap of key announcements and innovations directly from the Startup Hub at Google Cloud Next, highlighting the most impactful trends shaping the future of AI.
+5 Minutes
+link
+Copy link to share session
+Darren Mowry
+Vice President
+Global Startups
+Resources
+info
+News from Next 2026
+info
+Future of AI: GenMedia
+info
+Startup School: Agentic AI
+info
+AI Agents Challenge
+info
+Immersion Day w/ Antler
+The future of AI: How startups build competitive moats
+As the future of AI takes shape, startups are making big bets on what will matter long-term. Join leading founders for a real conversation about how they’re building moats beyond the model—what decisions paid off, which ones didn’t, and how they’re thinking about architecture, data, cost, and product today.
+15 Minutes
+link
+Copy link to share session
+Scott Barneson
+Managing Director
+North America Startups
+Simon Hørup Eskildsen
+Founder & CEO
+Turbopuffer
+Mukund Jha
+Founder & CEO
+Emergent
+Felipe Moreno
+CEO
+Jusbrasil
+Resources
+info
+News from Next 2026
+info
+Future of AI: GenMedia
+info
+Startup School: Agentic AI
+info
+AI Agents Challenge
+info
+Immersion Day w/ Antler
+Startups shipping at scale with Google DeepMind
+In the AI world, your only real moat is iteration speed. Logan Kilpatrick and founders from the front lines share their "recipe" for moving fast without breaking the model. We’ll look at real workflows using Google DeepMind's models, the technical trade-offs of multimodality, and how to stay ahead of the next model release.
+15 Minutes
+link
+Copy link to share session
+Logan Kilpatrick
+Group Product Manager
+Google DeepMind
+Michele Catasta
+President & Head of AI
+Replit
+Eno Reyes
+CTO & Co-Founder
+Factory
+Bianca Rangecroft
+Founder & CEO
+Whering
+Jay Wu
+Co-Founder & CTO
+Opus Clip
+Resources
+info
+News from Next 2026
+info
+Future of AI: GenMedia
+info
+Startup School: Agentic AI
+info
+AI Agents Challenge
+info
+Immersion Day w/ Antler
+Multimodal startups: Building AI that sees, speaks & creates
+The future of AI is multimodal and generative. Startup founders will discuss how they combine vision, speech, and language with tools like Imagen, Chirp, Veo, Lyria, and Gemini Live to build human-like experiences, prototype fast, scale production, and turn AI-driven creativity into real products.
+15 Minutes
+link
+Copy link to share session
+Arthur Soroken
+Co-Founder
+AI Futures Fund & Growth Hacking Lead
+Bin Liu
+VP of Product Engineering
+HeyGen
+Ben Budde
+VP of Revenue
+ElevenLabs
+Matt Rouif
+CEO & Co-Founder
+Photoroom
+Resources
+info
+News from Next 2026
+info
+Future of AI: GenMedia
+info
+Startup School: Agentic AI
+info
+AI Agents Challenge
+info
+Immersion Day w/ Antler
+From prompts to production: Startup multi-agent workflows
+Autonomous multi-agent systems are speeding up how startups build and scale. Founders share how they use frameworks like ADK, A2A, and MCP to orchestrate complex workflows, prototype faster, and deliver reliable next-gen AI solutions.
+15 Minutes
+link
+Copy link to share session
+Jamie de Guerre
+Senior Director, Outbound Product Management
+Cloud AI
+Akash Sharma
+CEO
+Vellum AI
+Maxim Fateev
+CTO
+Temporal
+George Kichukov
+Field CTO
+GitLab
+Resources
+info
+News from Next 2026
+info
+Future of AI: GenMedia
+info
+Startup School: Agentic AI
+info
+AI Agents Challenge
+info
+Immersion Day w/ Antler
+Expert insights: Live Q&A with Google Cloud experts
+Bring your questions and join the conversation. As our experts walk through the highlights, ask anything that comes up and get real-time insights on new launches, AI adoption, and business impact.
+
+30 Minutes
+link
+Copy link to share session
+Mirabel Tukiman
+Customer Engineer
+Google Cloud
+Gia Lim
+Customer Engineer, Infrastructure Modernization, Digital Natives
+Google Cloud
+Yuan Liu
+Customer Engineer, Applied & Generative AI
+Google Cloud
+Yazan Mughrabi
+Security Practice Lead
+AuNZ
+Resources
+info
+News from Next 2026
+info
+Future of AI: GenMedia
+info
+Startup School: Agentic AI
+info
+AI Agents Challenge
+info
+Immersion Day w/ Antler
+Closing remarks
+5 Minutes
+link
+Copy link to share session
+Darren Mowry
+Vice President
+Global Startups
+Resources
+info
+News from Next 2026
+info
+Future of AI: GenMedia
+info
+Startup School: Agentic AI
+info
+AI Agents Challenge
+info
+Immersion Day w/ Antler
+

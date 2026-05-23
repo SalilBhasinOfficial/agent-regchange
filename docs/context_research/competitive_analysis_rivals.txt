@@ -1,0 +1,118 @@
+=== OPTIMIZE SUBMITTED (12) ===
+[15349] "ARAGS" | Optimize (Existing Agents) | Submitted | Donald Leask 
+  → Ready to start building? Check out this guide for next steps.Problem to solveDentists, clinicians, doctors and admin spend 60% or more doing computer work. Our solutionARAGS gives that time back enabling users to spend more time where it counts
+  https://devpost.team/google-cloud-for-startups/projects/15349
+
+[15415] "Gemini Tales" | Optimize (Existing Agents) | Submitted | Veronika Kashtanova 
+  → Ready to start building? Check out this guide for next steps.Problem to solveCurrently, children spend hours passively consuming content, and existing interactive storytelling apps lack true autonomy and real-time physical verification. Our initial MVP proved that an AI agent can transform sedentary
+  https://devpost.team/google-cloud-for-startups/projects/15415
+
+[15483] "Work Docs" | Optimize (Existing Agents) | Submitted | Quoc Viet Ha 
+  → Ready to start building? Check out this guide for next steps.Problem to solveSelf-learners struggle to extract and retain knowledge from dense materials like PDFs, research papers, and textbooks. Reading is passive, note-taking is fragmented, and there is no feedback loop to ensure real understandin
+  https://devpost.team/google-cloud-for-startups/projects/15483
+
+[15496] "AuthorizedOps: Secure AI Agents That Act Across Your Tools" | Optimize (Existing Agents) | Submitted | Jayapragash Dakshnamurthy 
+  → Ready to start building? Check out this guide for next steps.AuthorizedOps enables AI agents to safely plan and execute real-world tasks across enterprise systems using secure, permissioned access.Problem to solveMost AI tools can suggest actions, but they cannot securely execute tasks across real s
+  https://devpost.team/google-cloud-for-startups/projects/15496
+
+[15574] "MCQGen" | Optimize (Existing Agents) | Submitted | Bulbul Hasan 
+  → Ready to start building? Check out this guide for next steps.Problem to solve Teachers waste countless hours manually writing MCQ exam papers, printing them, and grading answer sheets by hand. For schools managing hundreds of students across multiple classes, this process is slow, error-prone, and u
+  https://devpost.team/google-cloud-for-startups/projects/15574
+
+[15576] "Yaddai Project" | Optimize (Existing Agents) | Submitted | Antonio Martinez 
+  → Ready to start building? Check out this guide for next steps.Problem to solveCreative AI workflows often waste time and money because generation happens too early. A weak prompt, unclear creative direction, inconsistent identity, or low-quality concept can still trigger expensive image or video gene
+  https://devpost.team/google-cloud-for-startups/projects/15576
+
+[15682] "IntervYOU - Practice Mock Interviews with AI" | Optimize (Existing Agents) | Submitted | Sujal Tamrakar 
+  → Ready to start building? Check out this guide for next steps.Problem to solveThe biggest lie in tech recruitment is "If you can code, you will clear the interview." Most early-career developers possess strong technical skills but freeze during high-pressure, live technical interviews. Existing solut
+  https://devpost.team/google-cloud-for-startups/projects/15682
+
+[15754] "Parsley" | Optimize (Existing Agents) | Submitted | Peter Duffy 
+  → Ready to start building? Check out this guide for next steps.Problem to solveB2B sellers can’t tell which prospects are actually evaluating vs. politely browsing. Inbound forms are dying, cold outbound is interrupted and ignored, and third-party intent data is anonymous, account-level, and weeks lat
+  https://devpost.team/google-cloud-for-startups/projects/15754
+
+[15280] "ADV Strategy Pro: Sovereign Multi-Agent AEO Infrastructure" | Optimize (Existing Agents) | Submitted | Daniil Agarev 
+  → Problem to solve. Digital visibility is shifting from "ten blue links" to AI Overviews and agentic discovery engines. Most business data is semantically invisible to LLMs because it lacks structured grounding, JSON-LD typing, and citation density. Existing AI-content stacks are fragmented and halluc
+  https://devpost.team/google-cloud-for-startups/projects/15280
+
+[15572] "Astrology telegram bot (Track 2)" | Optimize (Existing Agents) | Submitted | Oleg Janeiko 
+  → Lunata: hyper-personalized lunar astrologyLangraph engine and telegram bot are builtMarket through automated IG content creation pipeline (POC built)Focus on distribution, how do we leverage AI to generate quality traffic to an existing product?Me:15 years tech experience, Apple, Salesforce, led a 4
+  https://devpost.team/google-cloud-for-startups/projects/15572
+
+[16145] "Adsnex" | Optimize (Existing Agents) | Submitted | Vishal Jariwala 
+  → Ready to start building? Check out this guide for next steps.Problem to solveDigital advertising for SMBs means juggling 4 separate platforms, 4 dashboards, and 4 learning curves. No platform coordinates autonomous intelligence end-to-end across Google Ads, Meta, LinkedIn, and TikTok. Decisions are 
+  https://devpost.team/google-cloud-for-startups/projects/16145
+
+[16038] "QLD2032  Queensland Infrastructure  Procurement Intelligence" | Optimize (Existing Agents) | Submitted | CHRISTOPHER SAVINS 
+  → QLD2032 is a System of Action for Queensland construction procurement intelligence — a vertical-specific implementation of the Agentic Data Cloud pattern Google announced at Cloud Next 2026, built independently by a solo founder. Domain registered 2019, dormant 2021-2025, active build commenced Nove
+  https://devpost.team/google-cloud-for-startups/projects/16038
+
+=== REFACTOR ALL (13) ===
+[15254] "Chris' project" | Refactor for Google Cloud Marketplace & Gemini Enterprise | Idea | Chris Ngandimoun; Bulbul Hasan 
+  → Problem to solveNon-technical users can now build apps using tools like Lovable, but they still cannot build AI-native applications.Current tools:Generate apps, not AI systemsLack structured ways to design:agentsmemoryreasoning flowsForce users to rely on fragile prompting instead of real AI archite
+  https://devpost.team/google-cloud-for-startups/projects/15254
+
+[15577] "CompanyLens" | Refactor for Google Cloud Marketplace & Gemini Enterprise | Idea | Sriram Srinivasan 
+  → Ready to start building? Check out this guide for next steps.Problem to solve[What's the problem you want to solve?]Our solution[What are you going to build?]
+  https://devpost.team/google-cloud-for-startups/projects/15577
+
+[15870] "Track3. WorkorAI Enterprise Self-Hosted Hiring Agent" | Refactor for Google Cloud Marketplace & Gemini Enterprise | Idea | Alex Yakushin 
+  → A self-hosted AI hiring system that runs inside the customer’s own Google Cloud environment, so candidate data, interview transcripts, and fit scores stay under the company’s control.Problem to solveEnterprise technical hiring has a data security problem.AI hiring tools can now screen, interview, an
+  https://devpost.team/google-cloud-for-startups/projects/15870
+
+[15872] "ACRA Agent Mesh" | Refactor for Google Cloud Marketplace & Gemini Enterprise | Idea | Darwin Thangappan; Evelyn James; Mohamed Imran; Mahiba Godwin; ARJUN PERIYASWAMY; Vicson Moses; Tom Praison 
+  → Ready to start building? Check out this guide for next steps.Problem to solveEnterprise users still spend too much time navigating complex ERP systems instead of simply expressing intent and getting work done.Our solutionACRA’s solution is an agentic AI platform built around a mesh of Enterprise AI 
+  https://devpost.team/google-cloud-for-startups/projects/15872
+
+[15566] "Dimona's project" | Refactor for Google Cloud Marketplace & Gemini Enterprise | Submitted | Dimona Patrick 
+  → Ready to start building? Check out this guide for next steps.Problem to solveModern software development is drowning in complexity:| Challenge | Impact ||-----------|--------|| **Code Reviews Take Hours** | Context switching destroys flow state; reviews get rushed or skipped || **Security is an Afte
+  https://devpost.team/google-cloud-for-startups/projects/15566
+
+[15359] "ntr's project" | Refactor for Google Cloud Marketplace & Gemini Enterprise | idea | ntr kenya 
+  → Ready to start building? Check out this guide for next steps.Problem to solve[What's the problem you want to solve?]Our solution[What are you going to build?]
+  https://devpost.team/google-cloud-for-startups/projects/15359
+
+[15546] "Hrudu's project" | Refactor for Google Cloud Marketplace & Gemini Enterprise | idea | Hrudu Shibu 
+  → Ready to start building? Check out this guide for next steps.Problem to solve[What's the problem you want to solve?]Our solution[What are you going to build?]
+  https://devpost.team/google-cloud-for-startups/projects/15546
+
+[15706] "Ryan's project" | Refactor for Google Cloud Marketplace & Gemini Enterprise | idea | Ryan Childress 
+  → Ready to start building? Check out this guide for next steps.Problem to solve[What's the problem you want to solve?]Our solution[What are you going to build?]
+  https://devpost.team/google-cloud-for-startups/projects/15706
+
+[15802] "Velasight" | Refactor for Google Cloud Marketplace & Gemini Enterprise | idea | Jamal Jones 
+  → Ready to start building? Check out this guide for next steps.Problem to solve[What's the problem you want to solve?]Our solution[What are you going to build?]
+  https://devpost.team/google-cloud-for-startups/projects/15802
+
+[16066] "Setiaji's project" | Refactor for Google Cloud Marketplace & Gemini Enterprise | idea | Setiaji Setiaji 
+  → Ready to start building? Check out this guide for next steps.Problem to solve[What's the problem you want to solve?]Our solution[What are you going to build?]
+  https://devpost.team/google-cloud-for-startups/projects/16066
+
+[16162] "Paras' project" | Refactor for Google Cloud Marketplace & Gemini Enterprise | idea | Paras Dev 
+  → Ready to start building? Check out this guide for next steps.Problem to solve[What's the problem you want to solve?]Our solution[What are you going to build?]
+  https://devpost.team/google-cloud-for-startups/projects/16162
+
+[15395] "Sejun's project" | Refactor for Google Cloud Marketplace & Gemini Enterprise | idea | Sangguen Chang; Sejun Kim 
+  → Ready to start building? Check out this guide for next steps.Problem to solve[What's the problem you want to solve?]Our solution[What are you going to build?]
+  https://devpost.team/google-cloud-for-startups/projects/15395
+
+[16563] "Daniel's project" | Refactor for Google Cloud Marketplace & Gemini Enterprise | idea | Daniel Zarzecki 
+  → Ready to start building? Check out this guide for next steps.Problem to solve[What's the problem you want to solve?]Our solution[What are you going to build?]
+  https://devpost.team/google-cloud-for-startups/projects/16563
+
+=== DIRECT RIVALS - BFSI/RegTech/India/KnowledgeGraph (4) ===
+[15518] "Kinetic Swarm" | Build (Net-New Agents) | Idea | Dustin Blevins 
+  → The Complex Business ProblemCurrent computer vision fitness tools rely on ancient models that flatten time and conflate root causes with downstream symptoms. A standard model can detect a symptom like "knee valgus," but it cannot tell a trainer if that valgus was caused by restricted ankle dorsiflex
+  https://devpost.team/google-cloud-for-startups/projects/15518
+
+[15744] "CausalMind Ops Engine" | Build (Net-New Agents) | Idea | Praveen Dominic Dharmalinga Pandian 
+  → CausalMind Ops Engine- Detect, diagnose, patch, prove — self-healing pipelines for the modern data stack.Problem to solveCurrent tools stop at detection or, at best, root-cause localization - naming the failing service, table, or deploy. None close the loop: writing the patch, validating recovery ag
+  https://devpost.team/google-cloud-for-startups/projects/15744
+
+[15288] "Synapse: Shared memory for your AI agent fleet" | Optimize (Existing Agents) | Idea | Joseph Thomas; Tanishq Kaul; Marisha Boyd 
+  → Your AI agents have amnesia. Join the team curing it!Problem to solveAI agents are powerful but stateless. Every conversation starts from zero. They don't know what you watched last week, what your team decided in Tuesday's meeting, or which of your anchor concepts a new idea connects to. Meanwhile,
+  https://devpost.team/google-cloud-for-startups/projects/15288
+
+[15965] "ARIA — Automated Regulatory Intelligence Agent" | Build (Net-New Agents) | Idea | Aarush Sawant 
+  → Problem to solveCurrent reality for India's 500+ SEBI-registered PMS firms:- 2-4 weeks average KYC onboarding time- 3–5 hours compliance officer time per file- ₹15,000+ cost per manual onboarding- 10% client abandonment rate during onboarding- ₹30–50 lakhs annual cost of enterprise tools (unaffordab
+  https://devpost.team/google-cloud-for-startups/projects/15965
