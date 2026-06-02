@@ -30,8 +30,15 @@ from pydantic import BaseModel, Field
 
 LOGGER = logging.getLogger(__name__)
 
-DEFAULT_RBI_FEED_URL = "https://www.rbi.org.in/Scripts/RssNotification.aspx"
-DEFAULT_SOURCE = "rbi_rss"
+# Default feed: SEBI's official RSS (validated 2026-06-02 — 30 entries,
+# valid RSS XML). RBI's older ``/Scripts/RssNotification.aspx`` endpoint
+# now returns an ASP.NET error HTML page, not RSS — we swapped to SEBI
+# because (a) it's in the same BFSI vertical, (b) RBI's portal has no
+# usable RSS today (parsing the notifications HTML page is a future
+# enhancement). The poller accepts any feed URL — judges or operators
+# can point it at a different regulator by setting ``CURATOR_RSS_FEED_URL``.
+DEFAULT_RBI_FEED_URL = "https://www.sebi.gov.in/sebirss.xml"
+DEFAULT_SOURCE = "sebi_rss"
 
 
 class DiscoveredItem(BaseModel):

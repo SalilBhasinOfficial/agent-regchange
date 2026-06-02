@@ -64,11 +64,14 @@ def poll() -> dict[str, Any]:
          skip these hashes. Performed AFTER publish so a Pub/Sub outage
          doesn't strand items as "discovered but never sent".
     """
+    import os
+
     poller = RssPoller()
     dedupe = Dedupe()
     publisher = Publisher()
 
-    items = poller.poll(DEFAULT_RBI_FEED_URL)
+    feed_url = os.environ.get("CURATOR_RSS_FEED_URL", DEFAULT_RBI_FEED_URL)
+    items = poller.poll(feed_url)
     unseen = dedupe.filter_new(items)
     published = publisher.publish_all(unseen)
     # Stamp first_seen only for items we successfully attempted to publish.

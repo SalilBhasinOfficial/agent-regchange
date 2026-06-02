@@ -67,7 +67,11 @@ artifact_service_uri = f"gs://{logs_bucket_name}" if logs_bucket_name else None
 
 app: FastAPI = get_fast_api_app(
     agents_dir=AGENT_DIR,
-    web=True,
+    # web=False so our Jinja UI at "/" is the front door, not ADK's Dev UI
+    # (which would otherwise redirect / → /dev-ui/). The Dev UI is for
+    # developer testing only; demo judges should land on the upload form.
+    # All ADK API routes (/run_sse, /apps/.../sessions, etc.) remain.
+    web=False,
     artifact_service_uri=artifact_service_uri,
     allow_origins=allow_origins,
     session_service_uri=session_service_uri,

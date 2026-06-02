@@ -153,5 +153,101 @@ it requires the same GCP auth as `adk run`.
 
 ---
 
+## Stage-2 deployment (Cloud Run × 2)
+
+The Curator stack ships as **two** Cloud Run services that share one container image:
+
+- **`curator-chain`** — the main agent surface. FastAPI UI (upload, Discovery Inbox, impact view, Q&A) + A2A skill card + ADK `/run_sse` + `/feedback`. Front door for judges.
+- **`curator-discovery`** — a tiny standalone service that polls a public regulator RSS feed every 30 minutes, dedupes against Spanner, and publishes new items to a Pub/Sub topic that the chain service consumes.
+
+### Prereqs
+- A GCP project (`curator-research` in the dev environment) with these APIs enabled: Cloud Run, Cloud Build, Artifact Registry, Pub/Sub, Cloud Scheduler, Spanner, Document AI, Vertex AI.
+- A Spanner instance + database with `app/ingest/spanner_schema.sql` applied (use `bash scripts/spanner_up.sh`).
+- A Document AI Layout Parser processor in the `us` location. Capture its full resource name.
+- A service account (e.g. `curator-ai-engine@…`) with `roles/spanner.client`, `roles/documentai.apiUser`, `roles/pubsub.publisher`, `roles/pubsub.subscriber`, plus the standard Cloud Run defaults.
+
+### One-time setup
+```bash
+# Pub/Sub topic + subscription
+gcloud pubsub topics create curator-discoveries --project=curator-research
+gcloud pubsub subscriptions create curator-chain-pull \
+    --topic=curator-discoveries --ack-deadline=300 --project=curator-research
+```
+
+### Deploy
+```bash
+# Chain service (UI + A2A + observability + Spanner-backed grounding)
+gcloud run deploy curator-chain \
+  --source=. \
+  --region=asia-south1 \
+  --project=curator-research \
+  --service-account=curator-ai-engine@curator-research.iam.gserviceaccount.com \
+  --allow-unauthenticated \
+  --memory=2Gi --cpu=2 --port=8080 \
+  --min-instances=0 --max-instances=5 --timeout=600 \
+  --set-env-vars="\
+GOOGLE_CLOUD_PROJECT=curator-research,\
+GOOGLE_CLOUD_LOCATION=global,\
+GOOGLE_GENAI_USE_VERTEXAI=True,\
+SPANNER_INSTANCE=curator-graph,\
+SPANNER_DATABASE=curator,\
+CURATOR_AGENT_RUN_LOG=1,\
+CURATOR_GROUNDING=spanner,\
+CURATOR_REAL_LLM=1,\
+CURATOR_DOCAI_PROCESSOR_ID=projects/890675948352/locations/us/processors/4c036f5845e938e7,\
+CURATOR_DISCOVERY_SUBSCRIBE=1,\
+CURATOR_DISCOVERY_SUBSCRIPTION=curator-chain-pull"
+
+# Discovery service (tiny — RSS poll + Pub/Sub publish only)
+gcloud run deploy curator-discovery \
+  --source=. \
+  --region=asia-south1 \
+  --project=curator-research \
+  --service-account=curator-ai-engine@curator-research.iam.gserviceaccount.com \
+  --allow-unauthenticated \
+  --memory=512Mi --cpu=1 --port=8080 \
+  --min-instances=0 --max-instances=2 --timeout=120 \
+  --command=uv \
+  --args="run,uvicorn,app.discovery.service:app,--host,0.0.0.0,--port,8080" \
+  --set-env-vars="\
+GOOGLE_CLOUD_PROJECT=curator-research,\
+SPANNER_INSTANCE=curator-graph,\
+SPANNER_DATABASE=curator,\
+CURATOR_DISCOVERY_TOPIC=curator-discoveries"
+
+# Cloud Scheduler — every 30 minutes, invoke /poll
+DISCOVERY_URL=$(gcloud run services describe curator-discovery \
+  --region=asia-south1 --project=curator-research --format='value(status.url)')
+gcloud scheduler jobs create http curator-discovery-poll \
+  --location=asia-south1 \
+  --schedule="*/30 * * * *" \
+  --uri="${DISCOVERY_URL}/poll" \
+  --http-method=POST \
+  --oidc-service-account-email=curator-ai-engine@curator-research.iam.gserviceaccount.com \
+  --oidc-token-audience="${DISCOVERY_URL}"
+```
+
+### Verify
+```bash
+CHAIN_URL=$(gcloud run services describe curator-chain --region=asia-south1 --project=curator-research --format='value(status.url)')
+
+curl -sS "${CHAIN_URL}/health"                                       # 200 OK
+curl -sS "${CHAIN_URL}/.well-known/agent.json" | jq '.skills | length'  # ≥ 5
+# Browser: open ${CHAIN_URL}/ → Curator upload page
+# Browser: open ${CHAIN_URL}/inbox → Discovery Inbox (populated after the first scheduler tick)
+```
+
+A2A inspector (gitignored at `tools/a2a-inspector/`) can be pointed at `${CHAIN_URL}` to enumerate skills.
+
+### Note on the RSS feed source
+RBI's `/Scripts/RssNotification.aspx` endpoint no longer returns RSS XML (returns an ASP.NET error page). The default feed in `app/discovery/rss_poller.py` is **SEBI's** `https://www.sebi.gov.in/sebirss.xml` — same BFSI vertical, valid feed, 30 entries verified as of 2026-06-02. Operators can override via the `CURATOR_RSS_FEED_URL` environment variable.
+
+### Region split (DECISIONS-9)
+- **Cloud Run + Spanner Graph**: `asia-south1` (Mumbai). All ingested regulatory text + bank policy data lives in-country.
+- **Vertex AI / Gemini-flash**: routed via `global`. Vertex AI region label (`us-central1` in the agent.py constant) is cosmetic.
+- **Document AI Layout Parser**: `us` only — the one cross-region call.
+
+---
+
 ## License
 Apache 2.0 (inherited from `agents-cli` scaffold).
