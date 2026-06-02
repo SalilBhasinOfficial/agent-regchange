@@ -82,17 +82,17 @@ def stub_judge(
     )
 
 
-def real_judge(
+def _format_judge_prompt(
     obligations: list[Obligation],
     matches: list[PolicyMatch],
     diffs: list[PolicyDiff],
-) -> ImpactSummary:
-    """Gemini-driven senior reviewer impact assessment and priority scoring."""
-    from app.runners import require_real_llm, run_agent
-    require_real_llm("judge")
+) -> str:
+    """Format the (obligations, matches, diffs) bundle into a single prompt.
 
-    agent = build_agent()
-
+    Shared by the single-shot legacy agent and each of the four panel
+    critics — they read the same package, just through different
+    perspective preambles.
+    """
     obligations_text = "\n".join(
         f"- Obligation ID: {o.id}\n  Subject: {o.subject}\n  Action: {o.action}\n  Deontic Type: {o.deontic_type.value}\n  Owner Hint: {o.owner_hint or 'None'}"
         for o in obligations
@@ -108,7 +108,7 @@ def real_judge(
         for d in diffs
     )
 
-    prompt = (
+    return (
         f"Regulatory Obligations:\n"
         f"======================\n"
         f"{obligations_text}\n\n"
@@ -120,21 +120,162 @@ def real_judge(
         f"{diffs_text}\n"
     )
 
-    res = run_agent(agent, prompt, output_schema=ImpactSummary)
-    return res
+
+def _real_judge_single_shot(
+    obligations: list[Obligation],
+    matches: list[PolicyMatch],
+    diffs: list[PolicyDiff],
+) -> ImpactSummary:
+    """Legacy single-agent judge path. Retained as the GEPA baseline
+    reference and for the ``CURATOR_JUDGE_MODE=single`` fallback. The
+    default path is the four-critic panel (:func:`real_judge`)."""
+    from app.runners import run_agent
+
+    agent = _build_single_judge_agent()
+    prompt = _format_judge_prompt(obligations, matches, diffs)
+    return run_agent(agent, prompt, output_schema=ImpactSummary)
 
 
-def build_agent():  # type: ignore[no-untyped-def]
+def real_judge(
+    obligations: list[Obligation],
+    matches: list[PolicyMatch],
+    diffs: list[PolicyDiff],
+) -> ImpactSummary:
+    """Four-critic debate-panel impact assessment with reconciliation + reflection.
+
+    Demo path (D3+). The same (obligations, matches, diffs) package is
+    evaluated by four senior-reviewer critics concurrently
+    (impact / icaap / pillar3 / ops_risk). The Reconciler merges their
+    four ImpactSummary outputs, and the Reflector inspects merged
+    confidence + missing_evidence (D2 stub: always escalates; D4 wires
+    Spanner re-query for low-confidence cases).
+
+    Set ``CURATOR_JUDGE_MODE=single`` to force the legacy single-shot
+    agent (kept for GEPA baseline runs and quick comparison demos).
+    """
+    import os
+    from app.runners import require_real_llm
+
+    require_real_llm("judge")
+
+    mode = os.environ.get("CURATOR_JUDGE_MODE", "panel").strip().lower()
+    if mode == "single":
+        return _real_judge_single_shot(obligations, matches, diffs)
+
+    # Lazy imports — keep this file importable without ADK installed.
+    from app.sub_agents.judge_panel import (
+        build_all_critic_agents,
+        reconcile_impacts,
+        reflect,
+    )
+
+    critic_agents = build_all_critic_agents()
+    prompt = _format_judge_prompt(obligations, matches, diffs)
+    critic_outputs = _run_panel(critic_agents, prompt)
+    merged = reconcile_impacts(critic_outputs)
+    decision = reflect([merged])
+    # D2 behaviour: decision.escalate is always True (no Spanner re-query
+    # yet). The decision is *logged* implicitly via the merged
+    # ImpactSummary's missing_evidence + confidence; D4 will branch here.
+    if not decision.escalate:  # pragma: no cover - D4 path
+        # placeholder for the D4 Spanner re-query branch.
+        pass
+    return merged
+
+
+def _run_panel(critic_agents, prompt: str) -> dict[str, ImpactSummary]:
+    """Execute the four critic agents concurrently against the same prompt.
+
+    Mirrors ``decompose._run_panel``: ThreadPoolExecutor so each call
+    goes through the existing ``run_agent`` (which manages its own
+    event loop), with a sequential fallback if the executor errors.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from app.runners import run_agent
+
+    results: dict[str, ImpactSummary] = {}
+    try:
+        with ThreadPoolExecutor(max_workers=len(critic_agents)) as ex:
+            fut_to_name = {
+                ex.submit(run_agent, agent, prompt, ImpactSummary): agent.name
+                for agent in critic_agents
+            }
+            for fut in as_completed(fut_to_name):
+                results[fut_to_name[fut]] = fut.result()
+    except Exception:  # pragma: no cover - degraded path
+        results = {}
+        for agent in critic_agents:
+            results[agent.name] = run_agent(agent, prompt, ImpactSummary)
+    return results
+
+
+def _build_single_judge_agent():  # type: ignore[no-untyped-def]
+    """The legacy one-shot judge agent. Used for the single-mode fallback."""
     from google.adk.agents import Agent
     from google.adk.models import Gemini
 
     return Agent(
-        name="judge_agent",
+        name="judge_agent_single",
         model=Gemini(model="gemini-flash-latest"),
         instruction=JUDGE_INSTRUCTION,
         description=(
-            "Scores impact and priority of the change package and "
-            "surfaces non-obvious downstream effects."
+            "Single-agent impact assessment (legacy/GEPA baseline). The "
+            "default demo path is the four-critic panel."
         ),
         output_schema=ImpactSummary,
+    )
+
+
+def build_agent():  # type: ignore[no-untyped-def]
+    """Construct the ADK-idiomatic debate-panel judge graph.
+
+    Returns a ``LoopAgent`` containing a ``SequentialAgent`` of
+    (``ParallelAgent`` of 4 critics, judge Reconciler), with the shared
+    Reflector as the loop's gate. This is what ``adk run`` / the A2A
+    agent card sees. The demo path uses :func:`real_judge` directly
+    (Python orchestration) for deterministic execution; this ADK graph
+    exists so judges can browse the debate-panel structure as a
+    discoverable skill.
+
+    Falls back to the single-agent shape when
+    ``CURATOR_JUDGE_MODE=single`` is set.
+    """
+    import os
+
+    mode = os.environ.get("CURATOR_JUDGE_MODE", "panel").strip().lower()
+    if mode == "single":
+        return _build_single_judge_agent()
+
+    from google.adk.agents import LoopAgent, ParallelAgent, SequentialAgent
+
+    from app.sub_agents.judge_panel import (
+        build_all_critic_agents,
+        build_reconciler_agent,
+        build_reflector_agent,
+    )
+
+    panel = ParallelAgent(
+        name="judge_panel",
+        sub_agents=build_all_critic_agents(),
+        description=(
+            "Four-critic senior-reviewer panel that scores impact from "
+            "impact / icaap / pillar3 / ops_risk angles."
+        ),
+    )
+    sequence = SequentialAgent(
+        name="judge_panel_with_reconcile",
+        sub_agents=[panel, build_reconciler_agent()],
+        description=(
+            "Run the 4-critic panel, then reconcile their ImpactSummary outputs."
+        ),
+    )
+    return LoopAgent(
+        name="judge_agent",
+        max_iterations=3,
+        sub_agents=[sequence, build_reflector_agent()],
+        description=(
+            "Debate-panel judge: 4-critic fan-out → Reconciler → Reflector. "
+            "The Reflector terminates the loop (D2) or triggers a Spanner "
+            "re-query and another iteration (D4+)."
+        ),
     )
