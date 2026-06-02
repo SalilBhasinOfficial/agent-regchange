@@ -175,46 +175,186 @@ def stub_decompose(clauses: list[AmendedClause]) -> list[Obligation]:
     return out
 
 
-def real_decompose(clauses: list[AmendedClause]) -> list[Obligation]:
-    """Gemini-driven decomposition of amended clauses into atomic obligations."""
-    from app.runners import require_real_llm, run_agent
-    require_real_llm("decompose")
+def _format_clause_prompt(c: AmendedClause) -> str:
+    return (
+        f"Clause ID: {c.clause_id}\n"
+        f"Heading: {c.heading or 'N/A'}\n"
+        f"Old Text: {c.old_text or 'None'}\n"
+        f"New Text: {c.new_text}"
+    )
 
-    agent = build_agent()
-    
+
+def _force_canonical_ids(obls: list[Obligation], c: AmendedClause) -> list[Obligation]:
+    """Stage-1-compatible ID normalisation. Demo expects ``obl-<clause>-<suffix>``."""
+    for i, obl in enumerate(obls):
+        obl.source_clause_id = c.clause_id
+        if not obl.id or obl.id == "NEW" or not obl.id.startswith("obl-"):
+            act_lc = obl.action.lower()
+            if "steady" in act_lc or "0.25" in obl.action:
+                suffix = "steady"
+            elif "phase" in act_lc or "0.10" in obl.action:
+                suffix = "phasein"
+            else:
+                suffix = str(i)
+            obl.id = f"obl-{c.clause_id}-{suffix}"
+    return obls
+
+
+def _real_decompose_single_shot(clauses: list[AmendedClause]) -> list[Obligation]:
+    """Legacy single-agent path. Retained as the GEPA baseline reference and
+    for the ``CURATOR_DECOMPOSE_MODE=single`` fallback. The default path is
+    the four-lens panel (:func:`real_decompose`)."""
+    from app.runners import run_agent
+
+    agent = _build_single_decompose_agent()
     out: list[Obligation] = []
     for c in clauses:
-        prompt = (
-            f"Clause ID: {c.clause_id}\n"
-            f"Heading: {c.heading or 'N/A'}\n"
-            f"Old Text: {c.old_text or 'None'}\n"
-            f"New Text: {c.new_text}"
-        )
-        res = run_agent(agent, prompt, output_schema=list[Obligation])
-        # Force correct metadata linkage and unique IDs
-        for i, obl in enumerate(res):
-            obl.source_clause_id = c.clause_id
-            if not obl.id or obl.id == "NEW" or not obl.id.startswith("obl-"):
-                # suffix based on subject/action uniqueness or index
-                suffix = "steady" if "steady" in obl.action.lower() or "0.25" in obl.action else ("phasein" if "phase" in obl.action.lower() or "0.10" in obl.action else str(i))
-                obl.id = f"obl-{c.clause_id}-{suffix}"
-            out.append(obl)
+        res = run_agent(agent, _format_clause_prompt(c), output_schema=list[Obligation])
+        out.extend(_force_canonical_ids(res, c))
     return out
 
 
-def build_agent():  # type: ignore[no-untyped-def]
-    """Construct the ADK Agent. Lazy — keeps import-time GCP-free."""
+def real_decompose(clauses: list[AmendedClause]) -> list[Obligation]:
+    """Four-lens debate-panel decomposition with reconciliation + reflection.
+
+    Demo path (D2+). Each clause is decomposed by four lenses concurrently
+    (banker / compliance / auditor / customer-protect). The Reconciler
+    merges the four obligation lists by (source_clause_id, action), and
+    the Reflector inspects aggregate confidence (D2 stub: always
+    terminates; D4 wires Spanner re-query for low-confidence cases).
+
+    Set ``CURATOR_DECOMPOSE_MODE=single`` to force the legacy single-shot
+    agent (kept for GEPA baseline runs and quick comparison demos).
+    """
+    import os
+    from app.runners import require_real_llm
+
+    require_real_llm("decompose")
+
+    mode = os.environ.get("CURATOR_DECOMPOSE_MODE", "panel").strip().lower()
+    if mode == "single":
+        return _real_decompose_single_shot(clauses)
+
+    # Lazy imports — keep this file importable without ADK installed.
+    from app.sub_agents.lenses import LENS_NAMES, build_all_lens_agents
+    from app.sub_agents.reconciler import reconcile_obligations
+    from app.sub_agents.reflector import reflect
+
+    lens_agents = build_all_lens_agents()
+
+    out: list[Obligation] = []
+    for c in clauses:
+        lens_outputs = _run_panel(lens_agents, _format_clause_prompt(c))
+        # Force IDs *before* reconciliation so dedup keys are consistent.
+        for lens_name in LENS_NAMES:
+            lens_outputs[lens_name] = _force_canonical_ids(
+                lens_outputs[lens_name], c
+            )
+        merged = reconcile_obligations(lens_outputs)
+        decision = reflect(merged)
+        # D2: decision.escalate is always True (no Spanner re-query yet).
+        # The decision is *logged* implicitly via the obligations'
+        # missing_evidence + confidence; D4 will branch here.
+        if not decision.escalate:  # pragma: no cover - D4 path
+            # placeholder for the D4 Spanner re-query branch.
+            pass
+        out.extend(merged)
+    return out
+
+
+def _run_panel(lens_agents, prompt: str) -> dict[str, list[Obligation]]:
+    """Execute the four lens agents concurrently against the same prompt.
+
+    Uses ThreadPoolExecutor so each lens call goes through the existing
+    ``run_agent`` (which manages its own event loop). Falls back to
+    sequential execution if the executor errors — better a slow correct
+    panel than a flaky one.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from app.runners import run_agent
+
+    results: dict[str, list[Obligation]] = {}
+    try:
+        with ThreadPoolExecutor(max_workers=len(lens_agents)) as ex:
+            fut_to_name = {
+                ex.submit(run_agent, agent, prompt, list[Obligation]): agent.name
+                for agent in lens_agents
+            }
+            for fut in as_completed(fut_to_name):
+                results[fut_to_name[fut]] = fut.result()
+    except Exception:  # pragma: no cover - degraded path
+        # Sequential fallback. Same return shape.
+        results = {}
+        for agent in lens_agents:
+            results[agent.name] = run_agent(agent, prompt, list[Obligation])
+    return results
+
+
+def _build_single_decompose_agent():  # type: ignore[no-untyped-def]
+    """The legacy one-shot decompose agent. Used for the single-mode fallback."""
     from google.adk.agents import Agent
     from google.adk.models import Gemini
 
     return Agent(
-        name="decompose_agent",
+        name="decompose_agent_single",
         model=Gemini(model="gemini-flash-latest"),
         instruction=DECOMPOSE_INSTRUCTION,
         description=(
-            "Decomposes amended RBI clauses into atomic obligations. One "
-            "clause can yield several obligations with distinct owners "
-            "and timelines."
+            "Single-agent decomposition of amended RBI clauses (legacy/GEPA "
+            "baseline). The default demo path is the four-lens panel."
         ),
         output_schema=list[Obligation],
+    )
+
+
+def build_agent():  # type: ignore[no-untyped-def]
+    """Construct the ADK-idiomatic debate-panel decompose graph.
+
+    Returns a ``LoopAgent`` containing a ``SequentialAgent`` of
+    (``ParallelAgent`` of 4 lenses, ``Reconciler``), with a ``Reflector``
+    as the loop's gate. This is what ``adk run`` / the A2A agent card
+    sees. The demo path uses :func:`real_decompose` directly (Python
+    orchestration) for deterministic execution; this ADK graph exists
+    so judges can browse the debate-panel structure as a discoverable
+    skill.
+
+    Falls back to the single-agent shape when
+    ``CURATOR_DECOMPOSE_MODE=single`` is set.
+    """
+    import os
+
+    mode = os.environ.get("CURATOR_DECOMPOSE_MODE", "panel").strip().lower()
+    if mode == "single":
+        return _build_single_decompose_agent()
+
+    from google.adk.agents import LoopAgent, ParallelAgent, SequentialAgent
+
+    from app.sub_agents.lenses import build_all_lens_agents
+    from app.sub_agents.reconciler import build_agent as build_reconciler
+    from app.sub_agents.reflector import build_agent as build_reflector
+
+    panel = ParallelAgent(
+        name="decompose_panel",
+        sub_agents=build_all_lens_agents(),
+        description=(
+            "Four-lens stakeholder panel that decomposes the amended clause "
+            "from banker / compliance / auditor / customer-protect angles."
+        ),
+    )
+    sequence = SequentialAgent(
+        name="decompose_panel_with_reconcile",
+        sub_agents=[panel, build_reconciler()],
+        description=(
+            "Run the 4-lens panel, then reconcile their obligation lists."
+        ),
+    )
+    return LoopAgent(
+        name="decompose_agent",
+        max_iterations=3,
+        sub_agents=[sequence, build_reflector()],
+        description=(
+            "Debate-panel decompose: 4-lens fan-out → Reconciler → Reflector. "
+            "The Reflector terminates the loop (D2) or triggers a Spanner "
+            "re-query and another iteration (D4+)."
+        ),
     )
