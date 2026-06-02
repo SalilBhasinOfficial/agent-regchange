@@ -200,6 +200,10 @@ my_env.tfvars
 tools/a2a-inspector/
 .secrets/
 
+# ADK runtime caches (session.db, eval_history) — created by `adk run`, `agents-cli playground`, eval runs
+**/.adk/
+/curator/
+
 # Personal documents
 inout/*.jpg
 inout/*.jpeg
