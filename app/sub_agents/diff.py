@@ -7,6 +7,8 @@ reviewer is always in the loop (an explicit Stage-1 safety constraint).
 
 from __future__ import annotations
 
+import os
+
 from app.models import Obligation, PolicyDiff, PolicyDocument, PolicyMatch
 
 DIFF_INSTRUCTION = """You draft specific suggested edits to internal bank
@@ -106,7 +108,14 @@ def real_diff(
     obligations: list[Obligation],
     policies: list[PolicyDocument],
 ) -> list[PolicyDiff]:
-    """Gemini-driven edit synthesis to draft suggested edits to bank policies."""
+    """Gemini-driven edit synthesis to draft suggested edits to bank policies.
+
+    D5 speed-lift: non-full matches are drafted concurrently via a
+    ThreadPoolExecutor (up to ``CURATOR_DIFF_CONCURRENCY`` workers,
+    default 8). Each diff is still one Gemini call; the parallel fan-
+    out drops wall-clock from O(N) to O(N/8) for typical 10-19 diffs.
+    """
+    from concurrent.futures import ThreadPoolExecutor
     from app.runners import require_real_llm, run_agent
     require_real_llm("diff")
 
@@ -117,25 +126,25 @@ def real_diff(
         s.policy_section_id: s for p in policies for s in p.sections
     }
 
-    out: list[PolicyDiff] = []
-    for m in matches:
-        if m.coverage == "full":
-            continue
-
+    def _resolve_target(m: PolicyMatch) -> tuple[Obligation | None, str, str, str]:
+        """Return (obligation, section_id, current_heading, current_text)."""
         obl = obl_by_id.get(m.obligation_id)
         if not obl:
-            continue
-
+            return None, "", "", ""
         if m.coverage == "missing" or not m.policy_section_id:
-            current_heading = "None (Creating new section)"
-            current_text = ""
-            section_id = "NEW"
-        else:
-            sec = section_map.get(m.policy_section_id)
-            current_heading = sec.heading if sec else "Unknown"
-            current_text = sec.text if sec else ""
-            section_id = m.policy_section_id
+            return obl, "NEW", "None (Creating new section)", ""
+        sec = section_map.get(m.policy_section_id)
+        return (
+            obl,
+            m.policy_section_id,
+            sec.heading if sec else "Unknown",
+            sec.text if sec else "",
+        )
 
+    def _diff_one(m: PolicyMatch) -> PolicyDiff | None:
+        obl, section_id, current_heading, current_text = _resolve_target(m)
+        if obl is None:
+            return None
         prompt = (
             f"Policy Section Details:\n"
             f"  Section ID: {section_id}\n"
@@ -151,7 +160,6 @@ def real_diff(
             f"  Coverage Assessment: {m.coverage}\n"
             f"  Mapper Rationale: {m.rationale}\n"
         )
-
         res = run_agent(agent, prompt, output_schema=PolicyDiff)
         res.policy_section_id = section_id
         res.current_text = current_text
@@ -159,9 +167,18 @@ def real_diff(
             res.related_obligation_ids = [obl.id]
         elif obl.id not in res.related_obligation_ids:
             res.related_obligation_ids.append(obl.id)
+        return res
 
-        out.append(res)
-    return out
+    todo = [m for m in matches if m.coverage != "full"]
+    if not todo:
+        return []
+    max_workers = int(os.environ.get("CURATOR_DIFF_CONCURRENCY", "8"))
+    try:
+        with ThreadPoolExecutor(max_workers=max_workers) as ex:
+            results = list(ex.map(_diff_one, todo))
+    except Exception:  # pragma: no cover - degraded path; sequential fallback
+        results = [_diff_one(m) for m in todo]
+    return [r for r in results if r is not None]
 
 
 def build_agent():  # type: ignore[no-untyped-def]

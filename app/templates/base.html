@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Curator{% endblock %}</title>
+  <script src="https://unpkg.com/htmx.org@1.9.10" defer></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      background: #0b1020;
+      color: #d8e1ee;
+      margin: 0;
+      padding: 0;
+      line-height: 1.5;
+    }
+    .nav {
+      background: #050a14;
+      border-bottom: 1px solid #1f2937;
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      gap: 28px;
+    }
+    .nav .brand {
+      color: #76b900;
+      font-weight: 700;
+      font-size: 18px;
+      letter-spacing: -0.01em;
+    }
+    .nav a {
+      color: #9fd0ff;
+      text-decoration: none;
+      font-size: 14px;
+    }
+    .nav a:hover { color: #d8e1ee; }
+    .nav .spacer { flex: 1; }
+    .nav .meta { color: #6b7280; font-size: 12px; }
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+    h1 {
+      color: #76b900;
+      font-size: 24px;
+      margin: 0 0 8px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    h2 {
+      color: #9fd0ff;
+      font-size: 16px;
+      margin: 0 0 16px;
+      font-weight: 500;
+    }
+    h3 {
+      color: #d8e1ee;
+      font-size: 14px;
+      margin: 20px 0 8px;
+      font-weight: 600;
+    }
+    .card {
+      background: #0f172a;
+      border: 1px solid #1f2937;
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin: 16px 0;
+    }
+    .card.amber { border-left: 3px solid #d97706; }
+    .card.red { border-left: 3px solid #dc2626; }
+    .card.green { border-left: 3px solid #16a34a; }
+    button, .btn {
+      background: #76b900;
+      color: #0b1020;
+      border: 0;
+      padding: 10px 18px;
+      border-radius: 6px;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover, .btn:hover { background: #92ce1a; }
+    button[disabled] { background: #3a4757; color: #6b7280; cursor: not-allowed; }
+    .btn.secondary { background: transparent; color: #9fd0ff; border: 1px solid #1f2937; }
+    .btn.secondary:hover { background: #0f172a; color: #d8e1ee; }
+    input[type="file"], input[type="text"], textarea, select {
+      background: #050a14;
+      color: #d8e1ee;
+      border: 1px solid #1f2937;
+      padding: 10px 12px;
+      border-radius: 6px;
+      font: inherit;
+      width: 100%;
+    }
+    label { display: block; color: #9ca3af; font-size: 12px; margin: 12px 0 4px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .pill {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      border: 1px solid #1f2937;
+    }
+    .pill.low { color: #9fd0ff; }
+    .pill.medium { color: #d97706; border-color: #6b3a05; }
+    .pill.high { color: #dc2626; border-color: #6b1212; }
+    .pill.critical { color: #fff; background: #dc2626; border-color: #dc2626; }
+    .pill.full { color: #16a34a; }
+    .pill.partial { color: #d97706; }
+    .pill.missing { color: #dc2626; }
+    .pill.stale { color: #9ca3af; }
+    .pill.contradicts { color: #dc2626; background: #2a0a0a; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { color: #76b900; text-align: left; padding: 8px 10px; border-bottom: 2px solid #1f2937; font-weight: 600; }
+    td { padding: 8px 10px; border-bottom: 1px solid #1f2937; vertical-align: top; color: #d8e1ee; }
+    tr:hover td { background: #0f172a; }
+    .muted { color: #6b7280; }
+    .mono-small { font-family: ui-monospace, monospace; font-size: 11px; color: #9ca3af; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .footer-actions { margin: 24px 0; display: flex; gap: 12px; }
+    .stat {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 12px 16px;
+      background: #050a14;
+      border: 1px solid #1f2937;
+      border-radius: 8px;
+    }
+    .stat .num { color: #76b900; font-size: 22px; font-weight: 700; }
+    .stat .lbl { color: #6b7280; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 16px 0; }
+    .blockquote { border-left: 3px solid #76b900; padding: 4px 14px; color: #9fd0ff; font-style: italic; }
+    .hint { font-size: 12px; color: #6b7280; margin-top: 4px; }
+    pre.diff {
+      background: #050a14;
+      border: 1px solid #1f2937;
+      border-radius: 6px;
+      padding: 12px;
+      font-size: 12px;
+      white-space: pre-wrap;
+      overflow-x: auto;
+      color: #d8e1ee;
+    }
+    pre.diff .add { color: #16a34a; }
+    pre.diff .del { color: #dc2626; text-decoration: line-through; }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <span class="brand">Curator</span>
+    <a href="/">Upload</a>
+    <a href="/inbox">Inbox</a>
+    <a href="/docs">API</a>
+    <a href="/.well-known/agent.json">A2A card</a>
+    <span class="spacer"></span>
+    <span class="meta">Regulatory-change intelligence · proposals only · human in the loop</span>
+  </nav>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

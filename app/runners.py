@@ -175,6 +175,10 @@ def run_agent(
     max_attempts = 6
     backoff = 2.0
     agent_name = getattr(agent, "name", "?")
+    # D5: pull the agent's instruction prompt so log_run can hash it
+    # alongside (agent_name, user_text) — gives GEPA correct grouping
+    # across panel critics that share user_text but differ on instruction.
+    instruction = getattr(agent, "instruction", None)
 
     for attempt in range(max_attempts):
         t0 = time.monotonic()
@@ -187,6 +191,7 @@ def run_agent(
                 output_text=text,
                 lens=lens,
                 latency_ms=latency_ms,
+                instruction=instruction,
             )
             if output_schema is None:
                 return text
@@ -211,6 +216,7 @@ def run_agent(
                 lens=lens,
                 latency_ms=latency_ms,
                 error=err_str[:500],
+                instruction=instruction,
             )
             raise
 

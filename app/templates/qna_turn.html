@@ -1,0 +1,8 @@
+{# Renders one Q&A turn — returned by HTMX partial from POST /qna/{run_id}. #}
+<div class="card">
+  <p class="blockquote">Q. {{ turn.question }}</p>
+  <p>{{ turn.answer }}</p>
+  {% if turn.citations %}
+  <p class="mono-small muted">Citations: {{ turn.citations | join(', ') }} · Confidence: {{ '%.2f' % turn.confidence }}</p>
+  {% endif %}
+</div>

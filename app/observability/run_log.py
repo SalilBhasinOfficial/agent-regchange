@@ -185,6 +185,7 @@ def log_run(
     cost_usd_estimated: float | None = None,
     parent_run_id: str | None = None,
     error: str | None = None,
+    instruction: str | None = None,
 ) -> str | None:
     """Write one row into ``agent_runs``. Never raises.
 
@@ -201,6 +202,10 @@ def log_run(
       parent_run_id: optional id of the run that triggered this one
         (e.g. a Reflector re-query).
       error: optional error string if the underlying call failed.
+      instruction: optional agent instruction prompt. Hashed alongside
+        ``(agent_name, input_text)`` so GEPA can group identical
+        prompts correctly — without this, different panel critics
+        sharing the same input collide on prompt_hash.
 
     Returns:
       The generated ``run_id`` (uuid4 hex) on a successful Spanner write;
@@ -219,7 +224,15 @@ def log_run(
 
     input_text_t = _truncate(input_text)
     output_text_t = _truncate(output_text)
-    prompt_hash = hashlib.sha256(input_text_t.encode("utf-8")).hexdigest()[:64]
+    # D5: include agent_name + instruction in the hash so GEPA groups
+    # variants correctly (e.g., 4 critic agents with the same user_text
+    # used to collide on a user-text-only hash).
+    _hash_payload = (
+        f"agent={agent_name}\n"
+        f"instruction={(instruction or '')[:8192]}\n"
+        f"input={input_text_t}"
+    )
+    prompt_hash = hashlib.sha256(_hash_payload.encode("utf-8")).hexdigest()[:64]
 
     try:
         from google.cloud import spanner  # type: ignore[import-not-found]

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Impact — {{ state.amendment.title or state.amendment.amendment_id }}{% endblock %}
+{% block content %}
+<h1>{{ state.amendment.title or state.amendment.amendment_id }}</h1>
+<h2>Pipeline run <code>{{ pipeline_run_id }}</code> · {{ state.amendment.effective_date or '' }}</h2>
+
+<div class="stat-row">
+  <div class="stat"><span class="num">{{ state.obligations | length }}</span><span class="lbl">Obligations</span></div>
+  <div class="stat"><span class="num">{{ missing_count }}</span><span class="lbl">Missing coverage</span></div>
+  <div class="stat"><span class="num">{{ state.diffs | length }}</span><span class="lbl">Suggested edits</span></div>
+  <div class="stat"><span class="num"><span class="pill {{ state.impact.priority }}">{{ state.impact.priority }}</span></span><span class="lbl">Priority</span></div>
+</div>
+
+<div class="card {{ state.impact.priority }}">
+  <h3>Impact summary</h3>
+  <p>{{ state.impact.summary }}</p>
+  <div class="grid-2">
+    <div>
+      <h3>Affected departments</h3>
+      <ul>{% for d in state.impact.affected_departments %}<li>{{ d }}</li>{% endfor %}</ul>
+    </div>
+    <div>
+      <h3>Downstream effects</h3>
+      <ul>{% for e in state.impact.downstream_effects %}<li>{{ e }}</li>{% endfor %}</ul>
+    </div>
+  </div>
+  <p class="mono-small muted">Confidence: {{ '%.2f' % state.impact.confidence }} · Impact score: {{ '%.2f' % state.impact.impact_score }}</p>
+</div>
+
+<h3>Obligations × Coverage</h3>
+<div class="card">
+  <table>
+    <thead>
+      <tr><th>Obligation</th><th>Deontic</th><th>Owner</th><th>Coverage</th><th>Confidence</th></tr>
+    </thead>
+    <tbody>
+      {% for obl in state.obligations %}
+      {% set m = matches_by_obl.get(obl.id) %}
+      <tr>
+        <td>
+          <strong>{{ obl.action }}</strong>
+          <div class="mono-small muted">{{ obl.id }} · {{ obl.source_clause_id }}{% if obl.temporal_scope %} · {{ obl.temporal_scope }}{% endif %}</div>
+        </td>
+        <td><span class="pill">{{ obl.deontic_type }}</span></td>
+        <td>{{ obl.owner_hint or '—' }}</td>
+        <td>
+          {% if m %}<span class="pill {{ m.coverage }}">{{ m.coverage }}</span>
+          {% if m.policy_section_id %}<div class="mono-small muted">{{ m.policy_section_id }}</div>{% endif %}
+          {% else %}<span class="muted">—</span>{% endif %}
+        </td>
+        <td class="mono-small">{{ '%.2f' % obl.confidence }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if state.diffs %}
+<h3>Suggested edits ({{ state.diffs | length }})</h3>
+{% for d in state.diffs %}
+<div class="card">
+  <h3>{{ d.policy_section_id }}</h3>
+  <p>{{ d.rationale }}</p>
+  <pre class="diff">{% if d.current_text %}<span class="del">{{ d.current_text }}</span>
+{% endif %}<span class="add">{{ d.suggested_text }}</span></pre>
+  <p class="mono-small muted">Related: {{ d.related_obligation_ids | join(', ') }} · Confidence: {{ '%.2f' % d.confidence }}</p>
+</div>
+{% endfor %}
+{% endif %}
+
+<h3>Ask a follow-up question</h3>
+<div class="card">
+  <form hx-post="/qna/{{ pipeline_run_id }}" hx-target="#qna-results" hx-swap="beforeend">
+    <input type="text" name="question" placeholder="e.g. Which obligations have no internal policy coverage?" required>
+    <div class="footer-actions">
+      <button type="submit">Ask</button>
+    </div>
+  </form>
+  <div id="qna-results"></div>
+</div>
+
+<div class="footer-actions">
+  <a class="btn secondary" href="/inbox">← Inbox</a>
+  <a class="btn secondary" href="/">Upload another</a>
+</div>
+{% endblock %}

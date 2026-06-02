@@ -7,6 +7,8 @@ internal policy section(s) that address it. ``missing`` is a valid
 
 from __future__ import annotations
 
+import os
+
 from app.models import Obligation, PolicyDocument, PolicyMatch
 
 MAP_INSTRUCTION = """You map regulatory obligations to a bank's internal
@@ -110,22 +112,29 @@ def stub_map(
 def real_map(
     obligations: list[Obligation], policies: list[PolicyDocument]
 ) -> list[PolicyMatch]:
-    """Gemini-driven classification of obligation coverage against bank policies."""
+    """Gemini-driven classification of obligation coverage against bank policies.
+
+    D5 speed-lift: obligations are now mapped concurrently via a
+    ThreadPoolExecutor (up to ``CURATOR_MAP_CONCURRENCY`` workers,
+    default 8). Each obligation is still one Gemini call; the parallel
+    fan-out drops wall-clock from O(N) to O(N/8) for the typical
+    20-obligation chain.
+    """
+    from concurrent.futures import ThreadPoolExecutor
     from app.runners import require_real_llm, run_agent
     require_real_llm("map")
 
     agent = build_agent()
 
-    # Flatten sections from all policies
+    # Flatten sections from all policies (built once, reused per prompt).
     sections = [s for p in policies for s in p.sections]
     sections_text = "\n".join(
         f"Section ID: {s.policy_section_id}\nHeading: {s.heading}\nText: {s.text}\n---"
         for s in sections
     )
 
-    out: list[PolicyMatch] = []
-    for obl in obligations:
-        prompt = (
+    def _format_prompt(obl: Obligation) -> str:
+        return (
             f"Candidate Internal Policy Sections:\n"
             f"===================================\n"
             f"{sections_text}\n\n"
@@ -138,11 +147,22 @@ def real_map(
             f"Deontic Type: {obl.deontic_type.value}\n"
             f"Temporal Scope: {obl.temporal_scope or 'None'}\n"
         )
-        res = run_agent(agent, prompt, output_schema=PolicyMatch)
+
+    def _map_one(obl: Obligation) -> PolicyMatch:
+        res = run_agent(agent, _format_prompt(obl), output_schema=PolicyMatch)
         res.obligation_id = obl.id
         if res.coverage == "missing":
             res.policy_section_id = None
-        out.append(res)
+        return res
+
+    max_workers = int(os.environ.get("CURATOR_MAP_CONCURRENCY", "8"))
+    out: list[PolicyMatch] = [None] * len(obligations)  # type: ignore[list-item]
+    try:
+        with ThreadPoolExecutor(max_workers=max_workers) as ex:
+            for i, fut in enumerate(ex.map(_map_one, obligations)):
+                out[i] = fut
+    except Exception:  # pragma: no cover - degraded path; sequential fallback
+        out = [_map_one(obl) for obl in obligations]
     return out
 
 
