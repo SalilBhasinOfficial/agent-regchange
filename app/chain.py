@@ -66,7 +66,13 @@ def run_chain(
     Swaps between deterministic stubs and real Gemini-driven agents
     based on the CURATOR_REAL_LLM environment variable.
     """
+    from app.observability.run_log import begin_pipeline_run
     from app.runners import real_llm_enabled
+
+    # Tag every agent_runs row emitted during this chain with one shared
+    # pipeline_run_id. The call is cheap (single uuid4 + ContextVar.set)
+    # and a no-op observable when CURATOR_AGENT_RUN_LOG is unset.
+    begin_pipeline_run()
 
     amendment, clauses = load_demo_amendment(amendment_id)
     backend = MockGroundingBackend()

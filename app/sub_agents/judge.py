@@ -197,7 +197,9 @@ def _run_panel(critic_agents, prompt: str) -> dict[str, ImpactSummary]:
     try:
         with ThreadPoolExecutor(max_workers=len(critic_agents)) as ex:
             fut_to_name = {
-                ex.submit(run_agent, agent, prompt, ImpactSummary): agent.name
+                ex.submit(
+                    run_agent, agent, prompt, ImpactSummary, lens=agent.name
+                ): agent.name
                 for agent in critic_agents
             }
             for fut in as_completed(fut_to_name):
@@ -205,7 +207,9 @@ def _run_panel(critic_agents, prompt: str) -> dict[str, ImpactSummary]:
     except Exception:  # pragma: no cover - degraded path
         results = {}
         for agent in critic_agents:
-            results[agent.name] = run_agent(agent, prompt, ImpactSummary)
+            results[agent.name] = run_agent(
+                agent, prompt, ImpactSummary, lens=agent.name
+            )
     return results
 
 

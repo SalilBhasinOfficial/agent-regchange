@@ -104,6 +104,81 @@ def reflect(obligations: list[Obligation]) -> ReflectionDecision:
     )
 
 
+def reflect_and_requery(
+    obligations: list[Obligation],
+    *,
+    namespace: str,
+    grounding=None,
+) -> tuple[ReflectionDecision, list[dict]]:
+    """D4 reflection with optional Spanner Graph re-query.
+
+    Wraps :func:`reflect` and, when the panel signal indicates the
+    result is shaky (aggregate confidence below
+    :data:`LOW_CONFIDENCE_THRESHOLD` OR a non-empty ``requeries`` cue
+    list), asks the grounding backend for additional context anchored
+    on the lowest-confidence obligation's source clause.
+
+    Best-effort: any failure inside the grounding backend (missing
+    method, network error, NotImplementedError) degrades silently to an
+    empty extra-context list. This keeps the Python demo path robust
+    while still surfacing the re-query path in trace logs.
+
+    Args:
+      obligations: the reconciled obligation list from the panel.
+      namespace: the Spanner demo/tenant namespace (passed through to
+        the backend; some implementations need it for tenant filtering).
+        Currently unused by ``query_graph_neighborhood`` but reserved
+        for future per-namespace scoping.
+      grounding: optional :class:`GroundingBackend`. Defaults to
+        :func:`app.grounding.get_grounding_backend` — lazily imported
+        so this module stays importable even before Track 1 lands the
+        SpannerGraphBackend / get_grounding_backend factory.
+
+    Returns:
+      ``(decision, extra_context)`` where ``decision`` is the
+      ReflectionDecision computed by :func:`reflect` and
+      ``extra_context`` is the list of dicts returned by the backend's
+      ``query_graph_neighborhood``. Empty list when no re-query
+      happened or the backend couldn't fulfil the request.
+    """
+    decision = reflect(obligations)
+
+    needs_requery = (
+        decision.aggregate_confidence < LOW_CONFIDENCE_THRESHOLD
+        or bool(decision.requeries)
+    )
+    if not needs_requery or not obligations:
+        return decision, []
+
+    if grounding is None:
+        try:
+            from app.grounding import get_grounding_backend  # lazy import
+            grounding = get_grounding_backend()
+        except Exception:  # noqa: BLE001 — best-effort
+            return decision, []
+
+    # Anchor the neighborhood query on the weakest-link obligation's
+    # source clause. Stable, simple, and matches what an operator would
+    # do triaging a low-confidence run.
+    lowest = min(obligations, key=lambda o: o.confidence)
+    node_id = lowest.source_clause_id
+
+    query_method = getattr(grounding, "query_graph_neighborhood", None)
+    if query_method is None:
+        return decision, []
+
+    try:
+        extra = query_method(
+            node_id=node_id,
+            depth=2,
+            requeries=decision.requeries,
+        )
+    except Exception:  # noqa: BLE001 — best-effort
+        return decision, []
+
+    return decision, list(extra) if extra else []
+
+
 REFLECTOR_INSTRUCTION = """You receive a reconciled list of regulatory
 Obligations produced by the four-lens decompose panel + Reconciler.
 Your job is to decide whether the panel's output is good enough to

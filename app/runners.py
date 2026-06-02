@@ -138,6 +138,8 @@ def run_agent(
     agent,
     user_text: str,
     output_schema: Any | None = None,
+    *,
+    lens: str | None = None,
 ):
     """Synchronously run an ADK Agent with a single user message.
 
@@ -151,6 +153,9 @@ def run_agent(
       output_schema: optional Python type to validate the response
         against (``Obligation``, ``list[Obligation]``, etc.). If
         omitted, the raw response text is returned.
+      lens: optional lens / critic name when the call originated from a
+        debate panel. Forwarded to the observability ``log_run`` writer
+        so panel rows are tagged with the lens that produced them.
 
     Returns:
       The validated pydantic model (or list thereof) if ``output_schema``
@@ -162,16 +167,32 @@ def run_agent(
     import time
     import random
 
+    # Lazy import — observability is best-effort and must never block
+    # importing this module (e.g. when google.cloud.spanner isn't installed
+    # in a constrained eval environment).
+    from app.observability.run_log import log_run
+
     max_attempts = 6
     backoff = 2.0
+    agent_name = getattr(agent, "name", "?")
 
     for attempt in range(max_attempts):
+        t0 = time.monotonic()
         try:
             text = _run_in_fresh_loop(_run_once_async(agent, user_text))
+            latency_ms = int((time.monotonic() - t0) * 1000)
+            log_run(
+                agent_name=agent_name,
+                input_text=user_text,
+                output_text=text,
+                lens=lens,
+                latency_ms=latency_ms,
+            )
             if output_schema is None:
                 return text
             return _coerce(text, output_schema)
         except Exception as e:
+            latency_ms = int((time.monotonic() - t0) * 1000)
             err_str = str(e)
             is_rate_limit = (
                 "429" in err_str
@@ -182,6 +203,15 @@ def run_agent(
                 sleep_time = (backoff ** attempt) + random.uniform(1.0, 3.0)
                 time.sleep(sleep_time)
                 continue
+            # Final failure (or non-rate-limit error) — log before re-raise.
+            log_run(
+                agent_name=agent_name,
+                input_text=user_text,
+                output_text="",
+                lens=lens,
+                latency_ms=latency_ms,
+                error=err_str[:500],
+            )
             raise
 
 

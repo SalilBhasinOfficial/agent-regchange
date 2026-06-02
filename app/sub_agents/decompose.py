@@ -277,7 +277,9 @@ def _run_panel(lens_agents, prompt: str) -> dict[str, list[Obligation]]:
     try:
         with ThreadPoolExecutor(max_workers=len(lens_agents)) as ex:
             fut_to_name = {
-                ex.submit(run_agent, agent, prompt, list[Obligation]): agent.name
+                ex.submit(
+                    run_agent, agent, prompt, list[Obligation], lens=agent.name
+                ): agent.name
                 for agent in lens_agents
             }
             for fut in as_completed(fut_to_name):
@@ -286,7 +288,9 @@ def _run_panel(lens_agents, prompt: str) -> dict[str, list[Obligation]]:
         # Sequential fallback. Same return shape.
         results = {}
         for agent in lens_agents:
-            results[agent.name] = run_agent(agent, prompt, list[Obligation])
+            results[agent.name] = run_agent(
+                agent, prompt, list[Obligation], lens=agent.name
+            )
     return results
 
 
