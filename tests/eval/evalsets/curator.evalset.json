@@ -1,7 +1,7 @@
 {
   "eval_set_id": "curator_v1",
   "name": "Curator regulatory-change-intelligence eval",
-  "description": "Stage-1 eval cases — thin by design. Each case primes the orchestrator with the fixture amendment AMD-2026-capital-adequacy and probes one node of the 5-step chain. Stage 2 will expand these once the LLM-driven path is wired.",
+  "description": "Stage-2 eval cases. The first 5 cases are the Stage-1 thin set; the next 25 are Stage-2 expansion cases, hand-authored after the same template, targeting fan-out depth, multi-hop Q&A, downstream-effect detection, contradictory coverage, and stale-policy buckets. All cases anchor to the fixture amendment AMD-2026-capital-adequacy (CRCB insertion, Pillar-3 disclosure update, climate-concentration board policy, ICAAP review cadence).",
   "eval_cases": [
     {
       "eval_id": "decompose_fanout",
@@ -53,6 +53,281 @@
         {
           "user_content": {
             "parts": [{"text": "Of the obligations you extracted, which ones have NO internal policy coverage? List by obligation id with citations."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "fanout_climate_concentration_board",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Decompose the climate-concentration board policy clause of AMD-2026-capital-adequacy. I expect at least three atomic obligations: (a) board approves a written climate-concentration policy, (b) policy sets exposure limits by high-emission sector, (c) policy is reviewed at least annually. Do not flatten."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "fanout_icaap_cadence",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Decompose the ICAAP review cadence clause. There are two distinct (subject, action, cadence) tuples: quarterly ICAAP refresh, plus an immediate-on-material-change trigger. Emit them as separate obligations with separate cadences."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "fanout_pillar3_disclosure",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Decompose the Pillar-3 disclosure update clause. I expect at least two atomic obligations: disclose CRCB level in the regulatory capital table, and disclose climate-sector concentration in a new qualitative narrative section."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "fanout_crcb_phasein_subject",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "From the CRCB clause, isolate the phase-in obligation as its own atomic item. It has a distinct deadline schedule (transition glidepath) and a distinct subject (transitional capital plan) versus the steady-state 0.25% maintenance obligation."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "fanout_board_review_cadence",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "For the climate-concentration board policy, separate the 'approve the policy' obligation from the 'review at least annually' obligation. They are distinct cadences and distinct board agenda items."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "fanout_icaap_material_change_trigger",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Decompose the 'immediate ICAAP refresh on material change' part of the ICAAP cadence clause as a standalone trigger-based obligation, distinct from the quarterly cadence."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "fanout_climate_sector_limits",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "The climate-concentration policy clause encodes both a policy-existence obligation and a sector-limit-setting obligation. Decompose both, preserving each (subject, action) tuple separately."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "fanout_full_amendment_atomic_count",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Decompose the entire AMD-2026-capital-adequacy amendment end to end. I expect at least 8 atomic obligations across the four clauses (CRCB, Pillar-3, climate-concentration board policy, ICAAP cadence). Do not collapse multi-cadence or multi-subject clauses."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "multihop_skip_phasein_exposure",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "If the bank skips the CRCB phase-in step and waits until the full-effective date, what is the regulatory exposure trajectory? Reason across the decomposed obligations, the coverage map, the diff, and the judge's downstream effects."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "multihop_partial_compliance_pillar3_only",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Suppose the bank adopts the Pillar-3 disclosure update but defers the CRCB and ICAAP cadence changes. Walking through the decompose -> map -> diff -> judge outputs, which obligations remain unmet and which downstream effects still fire? Cite obligation ids and policy sections."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "multihop_icaap_climate_scenario_chain",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Trace how the ICAAP cadence change interacts with the climate-concentration policy: the new quarterly ICAAP must include a climate-sector concentration scenario, which must be consistent with the board-approved limits. Identify each obligation and policy section involved, and any diff edits required to keep them consistent."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "multihop_capital_plan_revision_path",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Combine the decompose, map and judge outputs to explain why the capital plan must be revised. Which obligation triggers it, which policy section is currently missing or stale, and which downstream effect surfaces it?"}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "multihop_rmc_agenda_dependency",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Reason across the chain: which obligations require the RMC standing agenda to be updated, and which policy sections (POL-…#sN) must be edited via the diff to make that change durable? Cite obligation ids and section ids."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "downstream_icaap_recalibration",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Beyond editing the cadence section, what ICAAP recalibration work does this amendment force? I am looking for stress-book changes, scenario library updates, and calibration of climate-sector shocks. Do not stop at the direct policy edit."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "downstream_pillar3_template",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Which Pillar-3 disclosure templates (qualitative and quantitative) need a structural change because of this amendment? Identify them as downstream effects, not as the literal disclosure clause edit."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "downstream_training_rollout",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "What training rollout does this amendment require (credit officers, treasury, risk, board)? Surface this as a downstream effect a junior reviewer would miss when reading only the clause text."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "downstream_board_reporting_cadence",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Identify the changes this amendment forces on the board reporting cadence and pack: new CRCB metric in the capital dashboard, climate-concentration heat-map, ICAAP refresh status. Treat these as downstream effects, not direct edits."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "downstream_capital_plan_revision",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Surface the capital plan revision implied by the CRCB insertion: new internal capital target, dividend-distribution constraint while in transition, AT1/CET1 issuance plan. These are downstream effects, not the literal CRCB obligation."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "contradicts_no_climate_buffer",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "POL-CAP-001 section 2 currently states 'no additional climate-related capital buffer is required beyond the CCB and CCyB'. For the CRCB obligation, the right coverage label is 'contradicts', not 'partial' or 'missing' or 'stale'. Label it correctly and justify."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "contradicts_icaap_annual_only",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "POL-ICAAP-002 section 3 currently mandates 'ICAAP is performed annually and not more frequently'. Against the new quarterly + on-material-change obligation, this is a direct contradiction. Choose 'contradicts' over 'stale' and explain why."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "contradicts_no_sector_limits",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "POL-CRED-003 section 5 says 'the bank does not set sector-specific concentration limits for climate-sensitive industries'. Against the new climate-concentration board policy obligation, label this 'contradicts' and not 'missing'."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "contradicts_pillar3_excludes_climate",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "POL-DISC-004 section 4 says 'Pillar-3 disclosures exclude climate-related qualitative narrative pending RBI guidance'. The amendment now requires that narrative. Label coverage 'contradicts' and cite both the policy section and the obligation."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "stale_old_buffer_table",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "POL-CAP-001 section 1 contains a buffer table that lists CCB and CCyB but predates the CRCB. It is not contradictory, just an older version of the same rule. Label this 'stale' and not 'missing' or 'contradicts'."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "stale_old_icaap_calendar",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "POL-ICAAP-002 appendix A contains an ICAAP calendar referencing the previous annual cadence circular. It is the older version of the same cadence rule. Coverage label should be 'stale'."}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "curator", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "stale_old_pillar3_template_ref",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "POL-DISC-004 section 2 cross-references the pre-amendment Pillar-3 template version. It is not contradictory, just out of date. Label as 'stale' and recommend a pointer update via the diff."}]
           }
         }
       ],

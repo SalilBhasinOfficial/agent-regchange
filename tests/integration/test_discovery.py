@@ -94,7 +94,7 @@ def test_rss_poller_parses_embedded_xml() -> None:
             f"unexpected URL: {it.url}"
         )
         assert it.title, "title must be non-empty"
-        assert it.source == "rbi_rss"
+        assert it.source == "sebi_rss"
     # Hashes must be distinct across the 5 items.
     assert len({it.item_hash for it in items}) == 5, "hashes collided"
 
@@ -191,7 +191,7 @@ def test_publisher_serializes_message() -> None:
         assert body["item_hash"] == item.item_hash
         assert body["url"] == item.url
         assert body["title"] == item.title
-        assert body["source"] == "rbi_rss"
+        assert body["source"] == "sebi_rss"
         # discovered_at is set at publish time — just sanity check it parses.
         assert body["discovered_at"], "discovered_at must be populated"
 
