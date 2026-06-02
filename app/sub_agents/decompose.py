@@ -310,13 +310,20 @@ def _build_single_decompose_agent():  # type: ignore[no-untyped-def]
 def build_agent():  # type: ignore[no-untyped-def]
     """Construct the ADK-idiomatic debate-panel decompose graph.
 
-    Returns a ``LoopAgent`` containing a ``SequentialAgent`` of
-    (``ParallelAgent`` of 4 lenses, ``Reconciler``), with a ``Reflector``
-    as the loop's gate. This is what ``adk run`` / the A2A agent card
-    sees. The demo path uses :func:`real_decompose` directly (Python
-    orchestration) for deterministic execution; this ADK graph exists
-    so judges can browse the debate-panel structure as a discoverable
-    skill.
+    Returns ``SequentialAgent(ParallelAgent(4 lenses), Reconciler)`` —
+    the Reconciler is the last sub-agent so its ``list[Obligation]``
+    output is what bubbles up as the final response to ``adk run`` / the
+    A2A agent card / ``adk eval``.
+
+    The Reflector deliberately does NOT live in this ADK graph. It runs
+    in the Python demo path (:func:`real_decompose`) where it controls
+    optional Spanner re-query (D4+). Surfacing the Reflector as the
+    last sub-agent inside a ``LoopAgent`` would cause the parent to see
+    the Reflector's ``ReflectionDecision`` JSON as the final response
+    instead of the obligations — verified by the D3 Gate-1 eval where
+    that exact failure mode produced rubric scores of 0.0. The
+    Reflector still exists as a standalone ADK Agent factory in
+    ``app/sub_agents/reflector.py`` for A2A skill discoverability.
 
     Falls back to the single-agent shape when
     ``CURATOR_DECOMPOSE_MODE=single`` is set.
@@ -327,11 +334,10 @@ def build_agent():  # type: ignore[no-untyped-def]
     if mode == "single":
         return _build_single_decompose_agent()
 
-    from google.adk.agents import LoopAgent, ParallelAgent, SequentialAgent
+    from google.adk.agents import ParallelAgent, SequentialAgent
 
     from app.sub_agents.lenses import build_all_lens_agents
     from app.sub_agents.reconciler import build_agent as build_reconciler
-    from app.sub_agents.reflector import build_agent as build_reflector
 
     panel = ParallelAgent(
         name="decompose_panel",
@@ -341,20 +347,12 @@ def build_agent():  # type: ignore[no-untyped-def]
             "from banker / compliance / auditor / customer-protect angles."
         ),
     )
-    sequence = SequentialAgent(
-        name="decompose_panel_with_reconcile",
+    return SequentialAgent(
+        name="decompose_agent",
         sub_agents=[panel, build_reconciler()],
         description=(
-            "Run the 4-lens panel, then reconcile their obligation lists."
-        ),
-    )
-    return LoopAgent(
-        name="decompose_agent",
-        max_iterations=3,
-        sub_agents=[sequence, build_reflector()],
-        description=(
-            "Debate-panel decompose: 4-lens fan-out → Reconciler → Reflector. "
-            "The Reflector terminates the loop (D2) or triggers a Spanner "
-            "re-query and another iteration (D4+)."
+            "Debate-panel decompose: 4-lens fan-out → Reconciler. The "
+            "Python demo path (real_decompose) additionally runs the "
+            "Reflector for optional Spanner re-query (D4+)."
         ),
     )

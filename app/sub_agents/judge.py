@@ -229,13 +229,17 @@ def _build_single_judge_agent():  # type: ignore[no-untyped-def]
 def build_agent():  # type: ignore[no-untyped-def]
     """Construct the ADK-idiomatic debate-panel judge graph.
 
-    Returns a ``LoopAgent`` containing a ``SequentialAgent`` of
-    (``ParallelAgent`` of 4 critics, judge Reconciler), with the shared
-    Reflector as the loop's gate. This is what ``adk run`` / the A2A
-    agent card sees. The demo path uses :func:`real_judge` directly
-    (Python orchestration) for deterministic execution; this ADK graph
-    exists so judges can browse the debate-panel structure as a
-    discoverable skill.
+    Returns ``SequentialAgent(ParallelAgent(4 critics), Reconciler)`` —
+    the Reconciler is the last sub-agent so its ``ImpactSummary`` output
+    is what bubbles up as the final response to ``adk run`` / the A2A
+    agent card / ``adk eval``.
+
+    The Reflector deliberately does NOT live in this ADK graph (same
+    rationale as ``decompose.build_agent``: surfacing the Reflector as
+    the last sub-agent inside a ``LoopAgent`` causes the parent to see
+    the ``ReflectionDecision`` JSON as the final response instead of
+    the ImpactSummary). The Reflector still runs in the Python demo
+    path inside :func:`real_judge`.
 
     Falls back to the single-agent shape when
     ``CURATOR_JUDGE_MODE=single`` is set.
@@ -246,12 +250,11 @@ def build_agent():  # type: ignore[no-untyped-def]
     if mode == "single":
         return _build_single_judge_agent()
 
-    from google.adk.agents import LoopAgent, ParallelAgent, SequentialAgent
+    from google.adk.agents import ParallelAgent, SequentialAgent
 
     from app.sub_agents.judge_panel import (
         build_all_critic_agents,
         build_reconciler_agent,
-        build_reflector_agent,
     )
 
     panel = ParallelAgent(
@@ -262,20 +265,12 @@ def build_agent():  # type: ignore[no-untyped-def]
             "impact / icaap / pillar3 / ops_risk angles."
         ),
     )
-    sequence = SequentialAgent(
-        name="judge_panel_with_reconcile",
+    return SequentialAgent(
+        name="judge_agent",
         sub_agents=[panel, build_reconciler_agent()],
         description=(
-            "Run the 4-critic panel, then reconcile their ImpactSummary outputs."
-        ),
-    )
-    return LoopAgent(
-        name="judge_agent",
-        max_iterations=3,
-        sub_agents=[sequence, build_reflector_agent()],
-        description=(
-            "Debate-panel judge: 4-critic fan-out → Reconciler → Reflector. "
-            "The Reflector terminates the loop (D2) or triggers a Spanner "
-            "re-query and another iteration (D4+)."
+            "Debate-panel judge: 4-critic fan-out → Reconciler. The "
+            "Python demo path (real_judge) additionally runs the "
+            "Reflector for optional Spanner re-query (D4+)."
         ),
     )
