@@ -48,6 +48,28 @@ def stub_qna(state: AgentState, question: str) -> QnATurn:
     return QnATurn(question=question, answer=answer, citations=citations)
 
 
+def real_qna(state: AgentState, question: str) -> QnATurn:
+    """Gemini-driven interactive Q&A over the completed change-analysis state."""
+    from app.runners import require_real_llm, run_agent
+    require_real_llm("qna")
+
+    agent = build_agent()
+
+    state_json = state.model_dump_json(indent=2)
+    prompt = (
+        f"Completed Change Analysis Package State (JSON):\n"
+        f"===========================================\n"
+        f"{state_json}\n\n"
+        f"User Question:\n"
+        f"=============="
+        f"{question}\n"
+    )
+
+    res = run_agent(agent, prompt, output_schema=QnATurn)
+    res.question = question
+    return res
+
+
 def build_agent():  # type: ignore[no-untyped-def]
     from google.adk.agents import Agent
     from google.adk.models import Gemini
@@ -60,4 +82,5 @@ def build_agent():  # type: ignore[no-untyped-def]
             "Answers follow-up questions about a completed regulatory-"
             "change analysis package, with citations."
         ),
+        output_schema=QnATurn,
     )

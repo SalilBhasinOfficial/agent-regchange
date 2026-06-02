@@ -18,11 +18,22 @@
 # playground reach into this package and ask for ``app``; that triggers
 # the lazy construction in ``app.agent`` (PEP 562 ``__getattr__``).
 
-__all__ = ["app", "root_agent"]
+__all__ = ["app", "root_agent", "agent"]
+
+_loading = False
 
 
 def __getattr__(name: str):
+    global _loading
     if name in __all__:
-        from . import agent as _agent
-        return getattr(_agent, name)
+        if _loading:
+            raise AttributeError(name)
+        _loading = True
+        try:
+            from . import agent as _agent
+            if name == "agent":
+                return _agent
+            return getattr(_agent, name)
+        finally:
+            _loading = False
     raise AttributeError(name)

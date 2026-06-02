@@ -100,6 +100,45 @@ def stub_map(
     return out
 
 
+def real_map(
+    obligations: list[Obligation], policies: list[PolicyDocument]
+) -> list[PolicyMatch]:
+    """Gemini-driven classification of obligation coverage against bank policies."""
+    from app.runners import require_real_llm, run_agent
+    require_real_llm("map")
+
+    agent = build_agent()
+
+    # Flatten sections from all policies
+    sections = [s for p in policies for s in p.sections]
+    sections_text = "\n".join(
+        f"Section ID: {s.policy_section_id}\nHeading: {s.heading}\nText: {s.text}\n---"
+        for s in sections
+    )
+
+    out: list[PolicyMatch] = []
+    for obl in obligations:
+        prompt = (
+            f"Candidate Internal Policy Sections:\n"
+            f"===================================\n"
+            f"{sections_text}\n\n"
+            f"Regulatory Obligation to Map:\n"
+            f"============================\n"
+            f"Obligation ID: {obl.id}\n"
+            f"Source Clause ID: {obl.source_clause_id}\n"
+            f"Subject: {obl.subject}\n"
+            f"Action: {obl.action}\n"
+            f"Deontic Type: {obl.deontic_type.value}\n"
+            f"Temporal Scope: {obl.temporal_scope or 'None'}\n"
+        )
+        res = run_agent(agent, prompt, output_schema=PolicyMatch)
+        res.obligation_id = obl.id
+        if res.coverage == "missing":
+            res.policy_section_id = None
+        out.append(res)
+    return out
+
+
 def build_agent():  # type: ignore[no-untyped-def]
     from google.adk.agents import Agent
     from google.adk.models import Gemini
@@ -112,4 +151,5 @@ def build_agent():  # type: ignore[no-untyped-def]
             "Maps each obligation to the best-matching internal policy "
             "section and labels coverage."
         ),
+        output_schema=PolicyMatch,
     )

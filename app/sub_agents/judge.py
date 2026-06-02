@@ -71,6 +71,48 @@ def stub_judge(
     )
 
 
+def real_judge(
+    obligations: list[Obligation],
+    matches: list[PolicyMatch],
+    diffs: list[PolicyDiff],
+) -> ImpactSummary:
+    """Gemini-driven senior reviewer impact assessment and priority scoring."""
+    from app.runners import require_real_llm, run_agent
+    require_real_llm("judge")
+
+    agent = build_agent()
+
+    obligations_text = "\n".join(
+        f"- Obligation ID: {o.id}\n  Subject: {o.subject}\n  Action: {o.action}\n  Deontic Type: {o.deontic_type.value}\n  Owner Hint: {o.owner_hint or 'None'}"
+        for o in obligations
+    )
+
+    matches_text = "\n".join(
+        f"- Obligation ID: {m.obligation_id}\n  Policy Section: {m.policy_section_id or 'None'}\n  Coverage: {m.coverage}\n  Confidence: {m.confidence}\n  Rationale: {m.rationale or 'None'}"
+        for m in matches
+    )
+
+    diffs_text = "\n".join(
+        f"- Section: {d.policy_section_id}\n  Rationale: {d.rationale}\n  Suggested Text snippet: {d.suggested_text[:200]}..."
+        for d in diffs
+    )
+
+    prompt = (
+        f"Regulatory Obligations:\n"
+        f"======================\n"
+        f"{obligations_text}\n\n"
+        f"Policy Coverage Matches:\n"
+        f"=======================\n"
+        f"{matches_text}\n\n"
+        f"Suggested Diffs:\n"
+        f"================\n"
+        f"{diffs_text}\n"
+    )
+
+    res = run_agent(agent, prompt, output_schema=ImpactSummary)
+    return res
+
+
 def build_agent():  # type: ignore[no-untyped-def]
     from google.adk.agents import Agent
     from google.adk.models import Gemini
@@ -83,4 +125,5 @@ def build_agent():  # type: ignore[no-untyped-def]
             "Scores impact and priority of the change package and "
             "surfaces non-obvious downstream effects."
         ),
+        output_schema=ImpactSummary,
     )

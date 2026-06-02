@@ -55,18 +55,39 @@ def run_chain(
     amendment_id: str = "AMD-2026-capital-adequacy",
     questions: Iterable[str] = (),
 ) -> AgentState:
-    """Run the deterministic stub chain end-to-end and return the final state."""
+    """Run the chain end-to-end and return the final state.
+
+    Swaps between deterministic stubs and real Gemini-driven agents
+    based on the CURATOR_REAL_LLM environment variable.
+    """
+    from app.runners import real_llm_enabled
+
     amendment, clauses = load_demo_amendment(amendment_id)
     backend = MockGroundingBackend()
     policies = backend.load_bank_policies()
 
     state = AgentState(amendment=amendment, amended_clauses=clauses, policies=policies)
-    state.obligations = stub_decompose(state.amended_clauses)
-    state.matches = stub_map(state.obligations, state.policies)
-    state.diffs = stub_diff(state.matches, state.obligations, state.policies)
-    state.impact = stub_judge(state.obligations, state.matches, state.diffs)
-    for q in questions:
-        state.qna_history.append(stub_qna(state, q))
+
+    if real_llm_enabled():
+        from app.sub_agents.decompose import real_decompose
+        from app.sub_agents.diff import real_diff
+        from app.sub_agents.judge import real_judge
+        from app.sub_agents.map_ import real_map
+        from app.sub_agents.qna import real_qna
+
+        state.obligations = real_decompose(state.amended_clauses)
+        state.matches = real_map(state.obligations, state.policies)
+        state.diffs = real_diff(state.matches, state.obligations, state.policies)
+        state.impact = real_judge(state.obligations, state.matches, state.diffs)
+        for q in questions:
+            state.qna_history.append(real_qna(state, q))
+    else:
+        state.obligations = stub_decompose(state.amended_clauses)
+        state.matches = stub_map(state.obligations, state.policies)
+        state.diffs = stub_diff(state.matches, state.obligations, state.policies)
+        state.impact = stub_judge(state.obligations, state.matches, state.diffs)
+        for q in questions:
+            state.qna_history.append(stub_qna(state, q))
     return state
 
 

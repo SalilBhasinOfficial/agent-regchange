@@ -109,7 +109,7 @@ def _build_root_agent():  # type: ignore[no-untyped-def]
         ),
         sub_agents=sub_agents,
     )
-    return App(root_agent=root, name="curator")
+    return App(root_agent=root, name="app")
 
 
 # Top-level export expected by ``adk run`` / agents-cli playground.

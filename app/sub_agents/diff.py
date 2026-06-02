@@ -90,6 +90,69 @@ def stub_diff(
     return out
 
 
+def real_diff(
+    matches: list[PolicyMatch],
+    obligations: list[Obligation],
+    policies: list[PolicyDocument],
+) -> list[PolicyDiff]:
+    """Gemini-driven edit synthesis to draft suggested edits to bank policies."""
+    from app.runners import require_real_llm, run_agent
+    require_real_llm("diff")
+
+    agent = build_agent()
+
+    obl_by_id = {o.id: o for o in obligations}
+    section_map = {
+        s.policy_section_id: s for p in policies for s in p.sections
+    }
+
+    out: list[PolicyDiff] = []
+    for m in matches:
+        if m.coverage == "full":
+            continue
+
+        obl = obl_by_id.get(m.obligation_id)
+        if not obl:
+            continue
+
+        if m.coverage == "missing" or not m.policy_section_id:
+            current_heading = "None (Creating new section)"
+            current_text = ""
+            section_id = "NEW"
+        else:
+            sec = section_map.get(m.policy_section_id)
+            current_heading = sec.heading if sec else "Unknown"
+            current_text = sec.text if sec else ""
+            section_id = m.policy_section_id
+
+        prompt = (
+            f"Policy Section Details:\n"
+            f"  Section ID: {section_id}\n"
+            f"  Heading: {current_heading}\n"
+            f"  Current Text: {current_text}\n\n"
+            f"Regulatory Obligation to Incorporate:\n"
+            f"  Obligation ID: {obl.id}\n"
+            f"  Source Clause ID: {obl.source_clause_id}\n"
+            f"  Subject: {obl.subject}\n"
+            f"  Action: {obl.action}\n"
+            f"  Deontic Type: {obl.deontic_type.value}\n"
+            f"  Temporal Scope: {obl.temporal_scope or 'None'}\n"
+            f"  Coverage Assessment: {m.coverage}\n"
+            f"  Mapper Rationale: {m.rationale}\n"
+        )
+
+        res = run_agent(agent, prompt, output_schema=PolicyDiff)
+        res.policy_section_id = section_id
+        res.current_text = current_text
+        if not res.related_obligation_ids:
+            res.related_obligation_ids = [obl.id]
+        elif obl.id not in res.related_obligation_ids:
+            res.related_obligation_ids.append(obl.id)
+
+        out.append(res)
+    return out
+
+
 def build_agent():  # type: ignore[no-untyped-def]
     from google.adk.agents import Agent
     from google.adk.models import Gemini
@@ -103,4 +166,5 @@ def build_agent():  # type: ignore[no-untyped-def]
             "for partial/missing/stale/contradicts matches. Proposals "
             "only — never applies edits."
         ),
+        output_schema=PolicyDiff,
     )

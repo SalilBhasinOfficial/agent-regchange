@@ -33,6 +33,37 @@ For each Obligation:
 
 Return obligations as a JSON list matching the Obligation schema.
 Do not paraphrase the source clause — extract, don't invent.
+
+Example 1:
+Input clause:
+{
+  "clause_id": "MD-RBI-CAP-2025#11.5A",
+  "heading": "Climate Risk Capital Buffer",
+  "new_text": "Every bank shall maintain an additional Climate Risk Capital Buffer of 0.25 per cent of RWAs in the form of CET1 capital, on an ongoing basis. The CRCB shall be phased in at 0.10 per cent of RWAs from October 1, 2026 and the full 0.25 per cent from April 1, 2027. The buffer shall be over and above the Capital Conservation Buffer."
+}
+Expected Output:
+[
+  {
+    "id": "obl-MD-RBI-CAP-2025#11.5A-phasein",
+    "source_clause_id": "MD-RBI-CAP-2025#11.5A",
+    "deontic_type": "must",
+    "subject": "bank",
+    "action": "phase in Climate Risk Capital Buffer at 0.10 per cent of RWAs",
+    "condition": null,
+    "temporal_scope": "from October 1, 2026 to March 31, 2027",
+    "owner_hint": "CFO"
+  },
+  {
+    "id": "obl-MD-RBI-CAP-2025#11.5A-steady",
+    "source_clause_id": "MD-RBI-CAP-2025#11.5A",
+    "deontic_type": "must",
+    "subject": "bank",
+    "action": "maintain additional Climate Risk Capital Buffer of 0.25 per cent of RWAs in the form of CET1 capital over and above the Capital Conservation Buffer",
+    "condition": null,
+    "temporal_scope": "on an ongoing basis from April 1, 2027",
+    "owner_hint": "CFO"
+  }
+]
 """
 
 
@@ -128,6 +159,33 @@ def stub_decompose(clauses: list[AmendedClause]) -> list[Obligation]:
     return out
 
 
+def real_decompose(clauses: list[AmendedClause]) -> list[Obligation]:
+    """Gemini-driven decomposition of amended clauses into atomic obligations."""
+    from app.runners import require_real_llm, run_agent
+    require_real_llm("decompose")
+
+    agent = build_agent()
+    
+    out: list[Obligation] = []
+    for c in clauses:
+        prompt = (
+            f"Clause ID: {c.clause_id}\n"
+            f"Heading: {c.heading or 'N/A'}\n"
+            f"Old Text: {c.old_text or 'None'}\n"
+            f"New Text: {c.new_text}"
+        )
+        res = run_agent(agent, prompt, output_schema=list[Obligation])
+        # Force correct metadata linkage and unique IDs
+        for i, obl in enumerate(res):
+            obl.source_clause_id = c.clause_id
+            if not obl.id or obl.id == "NEW" or not obl.id.startswith("obl-"):
+                # suffix based on subject/action uniqueness or index
+                suffix = "steady" if "steady" in obl.action.lower() or "0.25" in obl.action else ("phasein" if "phase" in obl.action.lower() or "0.10" in obl.action else str(i))
+                obl.id = f"obl-{c.clause_id}-{suffix}"
+            out.append(obl)
+    return out
+
+
 def build_agent():  # type: ignore[no-untyped-def]
     """Construct the ADK Agent. Lazy — keeps import-time GCP-free."""
     from google.adk.agents import Agent
@@ -142,4 +200,5 @@ def build_agent():  # type: ignore[no-untyped-def]
             "clause can yield several obligations with distinct owners "
             "and timelines."
         ),
+        output_schema=list[Obligation],
     )

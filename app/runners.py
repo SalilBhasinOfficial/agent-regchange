@@ -159,10 +159,30 @@ def run_agent(
     Raises:
       RunnerError: ADK produced no text, or text didn't parse / validate.
     """
-    text = _run_in_fresh_loop(_run_once_async(agent, user_text))
-    if output_schema is None:
-        return text
-    return _coerce(text, output_schema)
+    import time
+    import random
+
+    max_attempts = 6
+    backoff = 2.0
+
+    for attempt in range(max_attempts):
+        try:
+            text = _run_in_fresh_loop(_run_once_async(agent, user_text))
+            if output_schema is None:
+                return text
+            return _coerce(text, output_schema)
+        except Exception as e:
+            err_str = str(e)
+            is_rate_limit = (
+                "429" in err_str
+                or "RESOURCE_EXHAUSTED" in err_str
+                or "exhausted" in err_str.lower()
+            )
+            if is_rate_limit and attempt < max_attempts - 1:
+                sleep_time = (backoff ** attempt) + random.uniform(1.0, 3.0)
+                time.sleep(sleep_time)
+                continue
+            raise
 
 
 def require_real_llm(node: str) -> None:
