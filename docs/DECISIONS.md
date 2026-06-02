@@ -97,3 +97,12 @@ A `comparison_mode` field on `AmendmentInput` (or a new `ComparisonInput` wrappe
 **Date:** 2026-05-18
 **Decision:** Installed `google-agents-cli` via `uv tool install google-agents-cli` (resulting binary at `~/.local/bin/agents-cli`). The corresponding ADK is `adk 1.33.0`.
 **Why:** Matches the CLAUDE.md guidance, gives an isolated tool environment, and surfaces both `agents-cli` and `google-agents-cli` entrypoints. `uvx google-agents-cli setup` is the alternative one-shot, but `uv tool install` is more durable across sessions.
+
+---
+
+## DECISIONS-9 — Region split: Vertex AI `us-central1`, Spanner `asia-south1`
+
+**Date:** 2026-06-02
+**Decision:** Vertex AI initialisation (`vertexai.init(project=..., location=...)` in `app/agent.py` and runner adapters) stays on **`us-central1`**. Spanner Graph stays on **`asia-south1`** per DECISIONS-6. These are unrelated regions — Vertex AI region only affects model-serving endpoints and Vertex API metadata; Spanner region governs data residency. Keeping them split is correct, not a drift.
+**Why:** Avoids the recurrent confusion of "the code says us-central1 but DECISIONS-6 says asia-south1." Documenting the split here closes that gap. The Indian-residency narrative depends only on Spanner being in `asia-south1` — `gemini-flash-latest` is served via `global` model routing anyway, so the Vertex region label is largely cosmetic.
+**Implication:** No code change required today. Cloud Run service deploy (D6) will be in `asia-south1` to co-locate compute with Spanner data; Document AI Layout Parser is `us` location (only available there).

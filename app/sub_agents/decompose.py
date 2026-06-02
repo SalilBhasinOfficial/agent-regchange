@@ -34,6 +34,17 @@ For each Obligation:
 Return obligations as a JSON list matching the Obligation schema.
 Do not paraphrase the source clause — extract, don't invent.
 
+For EACH Obligation also emit:
+  * confidence       — 0.0 to 1.0, your calibrated trust in the extraction.
+                       Below 0.6 will trigger the Reflector to re-query.
+                       Default to 0.7; raise to 0.9+ for clear, unambiguous
+                       extractions; lower for ambiguous or fan-out-uncertain.
+  * missing_evidence — a short list of strings naming evidence you wanted
+                       but couldn't find (e.g. ["effective date", "owner",
+                       "implementation guidance"]). Empty list if fully
+                       confident. The Reflector reads this list to drive
+                       a targeted re-query of the regulatory graph.
+
 Example 1:
 Input clause:
 {
@@ -98,6 +109,7 @@ def stub_decompose(clauses: list[AmendedClause]) -> list[Obligation]:
                     condition=None,
                     temporal_scope="from 2027-04-01 onwards",
                     owner_hint="CFO",
+                    confidence=1.0,
                 )
             )
             out.append(
@@ -113,6 +125,7 @@ def stub_decompose(clauses: list[AmendedClause]) -> list[Obligation]:
                     condition=None,
                     temporal_scope="2026-10-01 to 2027-03-31",
                     owner_hint="CFO",
+                    confidence=1.0,
                 )
             )
             continue
@@ -126,6 +139,7 @@ def stub_decompose(clauses: list[AmendedClause]) -> list[Obligation]:
                     action="update Pillar 3 disclosure policy to include CRCB",
                     temporal_scope="from FY 2027-28",
                     owner_hint="Investor Relations",
+                    confidence=1.0,
                 )
             )
             out.append(
@@ -140,6 +154,7 @@ def stub_decompose(clauses: list[AmendedClause]) -> list[Obligation]:
                     ),
                     temporal_scope="annually from FY 2027-28",
                     owner_hint="Investor Relations",
+                    confidence=1.0,
                 )
             )
             continue
@@ -154,6 +169,7 @@ def stub_decompose(clauses: list[AmendedClause]) -> list[Obligation]:
                 condition=None,
                 temporal_scope=None,
                 owner_hint=None,
+                confidence=1.0,
             )
         )
     return out

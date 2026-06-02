@@ -78,6 +78,16 @@ class Obligation(BaseModel):
         default=None,
         description="Likely internal owner (e.g. 'CFO', 'CRO', 'Compliance').",
     )
+    confidence: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description="Calibrated confidence in this extraction. Below 0.6 triggers the Reflector.",
+    )
+    missing_evidence: list[str] = Field(
+        default_factory=list,
+        description="Evidence the extractor wanted but couldn't find. Drives the Reflector loop.",
+    )
 
 
 # ----- the bank's side ------------------------------------------------------
@@ -120,6 +130,10 @@ class PolicyMatch(BaseModel):
     coverage: CoverageLevel
     confidence: float = Field(ge=0.0, le=1.0)
     rationale: str | None = None
+    missing_evidence: list[str] = Field(
+        default_factory=list,
+        description="Evidence the mapper wanted but couldn't find. Drives the Reflector loop.",
+    )
 
 
 # ----- the proposed change -------------------------------------------------
@@ -137,6 +151,16 @@ class PolicyDiff(BaseModel):
     suggested_text: str
     rationale: str
     related_obligation_ids: list[str] = Field(default_factory=list)
+    confidence: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description="Calibrated confidence in this suggested edit.",
+    )
+    missing_evidence: list[str] = Field(
+        default_factory=list,
+        description="Evidence the differ wanted but couldn't find (e.g. bank tone samples).",
+    )
 
 
 class ImpactSummary(BaseModel):
@@ -150,6 +174,16 @@ class ImpactSummary(BaseModel):
         description="Non-obvious second-order effects — the value-add of the judge.",
     )
     summary: str
+    confidence: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description="Calibrated confidence in this impact assessment.",
+    )
+    missing_evidence: list[str] = Field(
+        default_factory=list,
+        description="Evidence the judge wanted but couldn't find (e.g. ICAAP calibration data).",
+    )
 
 
 # ----- the shared state ----------------------------------------------------
@@ -170,12 +204,30 @@ class AgentState(BaseModel):
     diffs: list[PolicyDiff] = Field(default_factory=list)
     impact: ImpactSummary | None = None
     qna_history: list[QnATurn] = Field(default_factory=list)
+    confidence_log: dict[str, float] = Field(
+        default_factory=dict,
+        description="Per-agent aggregate confidence captured by the chain (key = agent name).",
+    )
+    reflection_count: int = Field(
+        default=0,
+        description="Number of Reflector loops invoked across this run.",
+    )
 
 
 class QnATurn(BaseModel):
     question: str
     answer: str
     citations: list[str] = Field(default_factory=list)
+    confidence: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description="Calibrated confidence in this answer.",
+    )
+    missing_evidence: list[str] = Field(
+        default_factory=list,
+        description="Evidence the Q&A agent wanted but couldn't find.",
+    )
 
 
 PolicyDocument.model_rebuild()

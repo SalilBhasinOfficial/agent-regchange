@@ -29,6 +29,13 @@ PolicyMatch per obligation, with:
 
 Be strict about 'full' — partial coverage is the more common honest
 answer for a real RBI amendment, and surfacing it is the whole point.
+
+For EACH PolicyMatch also emit:
+  * missing_evidence — short list of strings naming evidence you wanted
+                       but couldn't find in the supplied PolicySections
+                       (e.g. ["scope statement", "applicability to retail
+                       portfolio"]). Empty list if no gap. The Reflector
+                       reads this list to drive a targeted Spanner re-query.
 """
 
 

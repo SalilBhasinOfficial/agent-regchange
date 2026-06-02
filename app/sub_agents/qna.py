@@ -27,6 +27,16 @@ When answering:
   * If the user asks a question the analysis does not address, say so
     plainly and recommend re-running the chain.
   * Do not invent obligations, citations, or recommendations.
+
+Also emit:
+  * confidence       — 0.0 to 1.0, your calibrated trust in this answer.
+                       Default 0.7. Lower when the question pushes past
+                       what the analysis covers; the Reflector may re-query
+                       Spanner Graph for additional context.
+  * missing_evidence — short list naming evidence you wanted (e.g.
+                       ["full text of clause MD-RBI-CAP-2025#11.5A",
+                       "bank's prior ICAAP submission"]). Empty if
+                       confident.
 """
 
 
@@ -45,7 +55,7 @@ def stub_qna(state: AgentState, question: str) -> QnATurn:
         f"{sum(1 for m in state.matches if m.coverage == 'missing')} have "
         f"no internal policy coverage. Ask the judge_agent for impact."
     )
-    return QnATurn(question=question, answer=answer, citations=citations)
+    return QnATurn(question=question, answer=answer, citations=citations, confidence=1.0)
 
 
 def real_qna(state: AgentState, question: str) -> QnATurn:

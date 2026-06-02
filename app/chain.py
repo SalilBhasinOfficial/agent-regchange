@@ -30,6 +30,12 @@ from app.sub_agents.qna import stub_qna
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
+def _mean_confidence(items: list) -> float:
+    """Aggregate per-item confidence into a single float for confidence_log."""
+    vals = [getattr(it, "confidence", 1.0) for it in items]
+    return sum(vals) / len(vals) if vals else 1.0
+
+
 def load_demo_amendment(
     amendment_id: str = "AMD-2026-capital-adequacy",
 ) -> tuple[AmendmentInput, list[AmendedClause]]:
@@ -88,6 +94,14 @@ def run_chain(
         state.impact = stub_judge(state.obligations, state.matches, state.diffs)
         for q in questions:
             state.qna_history.append(stub_qna(state, q))
+
+    state.confidence_log = {
+        "decompose": _mean_confidence(state.obligations),
+        "map": _mean_confidence(state.matches),
+        "diff": _mean_confidence(state.diffs),
+        "judge": state.impact.confidence if state.impact else 1.0,
+        "qna": _mean_confidence(state.qna_history),
+    }
     return state
 
 

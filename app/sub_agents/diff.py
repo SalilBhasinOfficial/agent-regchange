@@ -24,6 +24,15 @@ contradicts, emit a PolicyDiff:
 If coverage is 'full', skip — no diff needed.
 
 NEVER autonomously apply edits. These are proposals for human review.
+
+For EACH PolicyDiff also emit:
+  * confidence       — 0.0 to 1.0, your calibrated trust in the suggested
+                       edit. Default 0.7; raise to 0.9+ when the rewrite is
+                       clearly mandated by the obligation; lower when tone
+                       or numbering convention is uncertain.
+  * missing_evidence — short list naming evidence you wanted (e.g.
+                       ["bank's preferred numbering style", "prior amendment
+                       template"]). Empty when confident.
 """
 
 
@@ -65,6 +74,7 @@ def stub_diff(
                         f"a new section is recommended (stub)."
                     ),
                     related_obligation_ids=[obl.id],
+                    confidence=1.0,
                 )
             )
         else:
@@ -85,6 +95,7 @@ def stub_diff(
                         f"Suggested wording brings it in line (stub)."
                     ),
                     related_obligation_ids=[obl.id],
+                    confidence=1.0,
                 )
             )
     return out

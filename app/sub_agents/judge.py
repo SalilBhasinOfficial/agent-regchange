@@ -33,6 +33,16 @@ Produce one ImpactSummary with:
   * summary              — one paragraph for the head of compliance.
 
 Be conservative on priority — false-positive 'critical' is costly.
+
+Also emit:
+  * confidence       — 0.0 to 1.0, your calibrated trust in this impact
+                       assessment. Default 0.7. Raise when the package is
+                       clearly bounded and well-documented; lower when
+                       downstream-effect inference relied on speculation.
+  * missing_evidence — short list naming evidence you wanted (e.g.
+                       ["ICAAP calibration figures", "current capital
+                       headroom"]). Empty if confident. The Reflector reads
+                       this to drive a targeted Spanner re-query.
 """
 
 
@@ -68,6 +78,7 @@ def stub_judge(
             f"covered by existing policy, {len(diffs)} suggested edits "
             f"(stub)."
         ),
+        confidence=1.0,
     )
 
 
