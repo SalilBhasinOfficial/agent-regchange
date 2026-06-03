@@ -218,6 +218,29 @@
 
 **Commit:** `phase-3.1: agent-optimizer pass + 25 simulated eval cases + accuracy audits`.
 
+### D7.5 — A2A bridge to bbb MCP (added end-of-session 2026-06-02, ~1 day)
+
+**Why this got added:** end-of-session question about pulling from QuestDB / TSDB / Milvus / Neo4j / object store (the bbb production stack). Direct ingestion of those into the public hackathon repo breaks the IP boundary (DECISIONS-1..9 + CLAUDE.md). An **A2A bridge** delivers the same "agent learns from multiple sources" value without crossing the wall: Curator gains one A2A *client* tool that POSTs to bbb's already-running MCP gateway. Curator stays IP-clean (it sees only the A2A interface); bbb's Milvus / Neo4j / QuestDB stay on bbb's side. Also doubles down on the Track-3 A2A protocol mandate (we already *expose* A2A skills; now we *consume* one too).
+
+**Files to add:**
+- `app/tools/bbb_a2a_client.py` — single `FunctionTool` wrapping a POST to `https://mcp.aidni.cloud/mcp` with bearer auth. Reads `BBB_MCP_BEARER` env var (never committed); fail-quiet if unset so the offline path stays green. Method names mirror bbb's MCP surface: `regulatory_deep_lookup(query, k=5)` → returns list of `{title, source_url, snippet, citation_count}` dicts.
+- `tests/integration/test_bbb_a2a_client.py` — 2 tests: hard-skip when `BBB_MCP_BEARER` unset; happy-path live test that asserts non-empty result list.
+
+**Files to modify (tiny):**
+- `app/sub_agents/qna.py` — add the new tool to the `tools=[…]` list of `build_agent()`. When `BBB_MCP_BEARER` is set at runtime, the Q&A agent can call it to enrich answers with cited bbb-corpus snippets. When unset, the agent doesn't call it (no offline-path impact).
+- `app/sub_agents/reflector.py` — optional: when `reflect_and_requery` returns empty `extra_context` from the Spanner backend AND `BBB_MCP_BEARER` is set, fall back to the A2A bridge as a secondary grounding source.
+- `README.md` — short subsection explaining: "Curator's hackathon repo includes an optional A2A bridge to a private enterprise data layer; the demo uses bbb's MCP gateway. Set `BBB_MCP_BEARER` and the Q&A turn enriches automatically; without it the chain runs against Spanner Graph alone."
+
+**Demo evidence:** one Q&A turn during the D9 video shows two answers side-by-side — Spanner-only vs Spanner+bbb-A2A-enriched — making the multi-source value visible without revealing what's behind the bridge.
+
+**Cost:** ~1 day. ~100 LOC. Zero new GCP services. ~$0 incremental Gemini spend (one extra QnA call per demo run).
+
+**File ownership:** me, sequential (no subagent — touches Q&A wiring which is sensitive). Lands between D7 and D8, so the D8 architecture diagram + Devpost fields can mention the A2A client surface.
+
+**Commit:** `phase-3.2: A2A bridge to bbb MCP — Q&A enrichment without crossing the IP wall`.
+
+**Defer-condition:** if D8 timeline is tight, this slips to Phase 5 cleanly — it's additive, not load-bearing for Gate 3 or Gate 4.
+
 ### D8 — Devpost assets (3 parallel subagents) + value-system narrative
 
 **Track A — Architecture diagram (subagent):**
