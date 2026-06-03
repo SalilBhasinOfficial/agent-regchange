@@ -26,25 +26,23 @@ Vertex AI RAG Engine.
 
 ---
 
-## Stage 1 status
+## Status
 
-| Step | Status |
+Stage-2 build complete (D1–D7, 2026-06-02). Highlights:
+
+| Capability | Status |
 |------|--------|
-| 1. Environment (Python 3.11, uv) | done |
-| 2. Scaffold via `agents-cli create` (`agentic_rag` template, `cloud_run` target) | done |
-| 3. DESIGN_SPEC + data contracts (`app/models.py`) | done |
-| 4. Multi-agent skeleton — orchestrator + 5 sub-agents, real ADK `Agent` defs | done (stubs) |
-| 5. Pydantic models threaded through every node | done |
-| 6. Grounding seam — `MockGroundingBackend` works today; `VertexRagBackend` stub | done (mock) |
-| 7. Domain fixtures (2 MDs, 1 amendment, 4 bank policies) | done |
-| 8. Eval set (5 cases, LLM-as-judge criteria) | done (thin by design) |
-| 9. End-to-end deterministic chain | done (`python -m app.chain`) |
-| 10. README + STAGE2_PLAN | done |
+| Real-LLM chain (decompose → map → diff → judge → qna) on Gemini-flash | done |
+| Debate panels (Reflector + adversarial review) | done |
+| Spanner Graph grounding (`curator-graph` / `curator`) | done |
+| Document AI Layout Parser ingest | done |
+| Discovery service (RSS poll → Pub/Sub → Spanner) | done |
+| Cloud Run × 2 (`curator-chain`, `curator-discovery`) — deploy-ready | done |
+| Agent Observability + Agent Optimizer + 30-case evalset | done |
+| Optional A2A bridge to external regulatory corpus (D7.5) | done |
 
-Stage 2 work — full agent-node logic, Vertex AI RAG Engine wiring,
-A2A interface, Cloud Run deploy, Agent Observability + Agent
-Simulation + Agent Optimizer, Agent Registry listing — is tracked in
-[`docs/STAGE2_PLAN.md`](docs/STAGE2_PLAN.md).
+Detailed plan and gates: [`docs/STAGE2_IMPLEMENTATION_PLAN.md`](docs/STAGE2_IMPLEMENTATION_PLAN.md).
+Stage-1 snapshot is preserved at [`docs/STAGE1_ACTUAL.md`](docs/STAGE1_ACTUAL.md).
 
 ---
 
@@ -55,7 +53,7 @@ LLM-driven path, the Google Cloud SDK with Application Default
 Credentials configured.
 
 ```bash
-cd ~/bs/agent
+cd ~/bs/agent-regchange
 uv sync --python 3.11        # creates .venv with all deps
 ```
 
@@ -121,7 +119,7 @@ it requires the same GCP auth as `adk run`.
 ## Project layout
 
 ```
-~/bs/agent/
+~/bs/agent-regchange/
 ├── app/
 │   ├── __init__.py               # lazy re-export of `app` / `root_agent`
 │   ├── agent.py                  # orchestrator + sub-agent registration

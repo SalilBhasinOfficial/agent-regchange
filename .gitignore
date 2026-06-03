@@ -209,3 +209,4 @@ inout/*.jpg
 inout/*.jpeg
 inout/*.png
 docs/context_research/*.jpg
+.claude/
