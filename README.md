@@ -249,5 +249,28 @@ RBI's `/Scripts/RssNotification.aspx` endpoint no longer returns RSS XML (return
 
 ---
 
+## Optional A2A bridge to an external corpus
+
+Curator can optionally enrich Q&A answers with snippets from a remote
+A2A/MCP gateway over a regulatory corpus. Set:
+
+```bash
+export BBB_MCP_BEARER="<token>"
+# optional overrides
+# export BBB_MCP_ENDPOINT="https://mcp.aidni.cloud/mcp"
+# export BBB_MCP_TOOL_NAME="regulatory_deep_lookup"
+```
+
+With the bearer set, `real_qna` prepends up to 5 cited snippets to its
+prompt before calling Gemini, and the Reflector falls back to the same
+gateway when the local Spanner Graph re-query returns nothing.
+
+With the bearer unset (the default for this public repo), every call is
+a silent no-op — the offline path and all unit + integration tests stay
+green. The bridge is intentionally consume-only: Curator never exposes
+the remote corpus' internals; it sees an A2A surface and nothing more.
+
+---
+
 ## License
 Apache 2.0 (inherited from `agents-cli` scaffold).

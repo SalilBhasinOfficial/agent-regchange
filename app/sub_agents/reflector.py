@@ -174,9 +174,22 @@ def reflect_and_requery(
             requeries=decision.requeries,
         )
     except Exception:  # noqa: BLE001 — best-effort
-        return decision, []
+        extra = None
 
-    return decision, list(extra) if extra else []
+    extra_list = list(extra) if extra else []
+
+    # D7.5 fallback: if the local Spanner Graph returned nothing AND the
+    # remote A2A bridge is enabled, query the external regulatory corpus
+    # on the first re-query cue. Fail-quiet on any error.
+    if not extra_list and decision.requeries:
+        try:
+            from app.tools.bbb_a2a_client import is_enabled, regulatory_deep_lookup
+            if is_enabled():
+                extra_list = regulatory_deep_lookup(decision.requeries[0], k=3)
+        except Exception:  # noqa: BLE001 — best-effort
+            extra_list = []
+
+    return decision, extra_list
 
 
 REFLECTOR_INSTRUCTION = """You receive a reconciled list of regulatory

@@ -59,17 +59,41 @@ def stub_qna(state: AgentState, question: str) -> QnATurn:
 
 
 def real_qna(state: AgentState, question: str) -> QnATurn:
-    """Gemini-driven interactive Q&A over the completed change-analysis state."""
+    """Gemini-driven interactive Q&A over the completed change-analysis state.
+
+    When ``BBB_MCP_BEARER`` is set, the prompt is enriched with snippets
+    from the remote A2A regulatory-corpus gateway. Offline-safe: with the
+    env var unset (the default), enrichment is a no-op and the prompt
+    composition matches the pre-D7.5 behavior.
+    """
     from app.runners import require_real_llm, run_agent
+    from app.tools.bbb_a2a_client import is_enabled, regulatory_deep_lookup
     require_real_llm("qna")
 
     agent = build_agent()
 
     state_json = state.model_dump_json(indent=2)
+
+    enrichment_block = ""
+    if is_enabled():
+        snippets = regulatory_deep_lookup(question, k=5)
+        if snippets:
+            enrichment_block = (
+                "\nA2A Enrichment (external regulatory corpus, cite as [bbb#N]):\n"
+                "==============================================================\n"
+                + "\n".join(
+                    f"[bbb#{i+1}] {s.get('title', 'untitled')} — {s.get('source_url', '')}\n"
+                    f"  {s.get('snippet', '')}"
+                    for i, s in enumerate(snippets)
+                )
+                + "\n"
+            )
+
     prompt = (
         f"Completed Change Analysis Package State (JSON):\n"
         f"===========================================\n"
-        f"{state_json}\n\n"
+        f"{state_json}\n"
+        f"{enrichment_block}\n"
         f"User Question:\n"
         f"=============="
         f"{question}\n"
