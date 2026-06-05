@@ -72,6 +72,7 @@ app: FastAPI = get_fast_api_app(
     # developer testing only; demo judges should land on the upload form.
     # All ADK API routes (/run_sse, /apps/.../sessions, etc.) remain.
     web=False,
+    a2a=True,  # mounts /.well-known/agent.json — Track-3 mandate
     artifact_service_uri=artifact_service_uri,
     allow_origins=allow_origins,
     session_service_uri=session_service_uri,

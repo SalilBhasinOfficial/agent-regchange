@@ -1,0 +1,71 @@
+{
+  "name": "curator-agent",
+  "description": "Curator — autonomous regulatory-change intelligence for Indian BFSI. Compares two regulatory documents, surfaces obligations + missing-coverage gaps + impact through a four-stakeholder-lens debate panel.",
+  "version": "0.1.0",
+  "url": "https://curator-chain-890675948352.asia-south1.run.app",
+  "protocol_version": "0.3.0",
+  "preferred_transport": "JSONRPC",
+  "default_input_modes": ["text/plain", "application/json"],
+  "default_output_modes": ["application/json"],
+  "capabilities": {
+    "streaming": true,
+    "push_notifications": false,
+    "state_transition_history": false
+  },
+  "skills": [
+    {
+      "id": "decompose-panel",
+      "name": "Decompose (4-lens debate panel)",
+      "description": "Break each amended regulatory clause into atomic obligations. Four parallel stakeholder lenses (banker, compliance officer, auditor, customer-protection) debate; a Reconciler merges; a Reflector triggers Spanner Graph re-query on low-confidence cases.",
+      "tags": ["regulation", "decompose", "debate", "obligations"],
+      "examples": [
+        "Decompose section 11.5A of the second-amendment circular into atomic obligations."
+      ]
+    },
+    {
+      "id": "map",
+      "name": "Map obligations to internal policies",
+      "description": "Match each obligation against the bank's existing policies and SOPs. Coverage is one of: full / partial / missing / stale / contradicts. Parallelized across obligations via ThreadPoolExecutor.",
+      "tags": ["mapping", "coverage", "policies"],
+      "examples": [
+        "Map the 22 obligations from the latest run against the bank's policy corpus."
+      ]
+    },
+    {
+      "id": "diff",
+      "name": "Generate suggested policy edits",
+      "description": "Produce concrete proposed edits with rationale for each obligation that is missing, partial, or stale. Proposals only — never auto-applied. Parallelized.",
+      "tags": ["diff", "edits", "proposals"],
+      "examples": [
+        "Draft the policy edits needed to close the 9 missing-coverage gaps."
+      ]
+    },
+    {
+      "id": "judge-panel",
+      "name": "Judge (4-critic impact panel)",
+      "description": "Score impact and priority; surface non-obvious downstream effects (capital plan, ICAAP, Pillar-3, RMC reporting). Four parallel critics (impact, ICAAP, Pillar-3, ops-risk) debate; Reconciler merges into a single ImpactSummary.",
+      "tags": ["impact", "priority", "downstream", "ICAAP", "Pillar-3"],
+      "examples": [
+        "Judge the impact of the second-amendment circular for a mid-cap commercial bank."
+      ]
+    },
+    {
+      "id": "qna",
+      "name": "Q&A over the analysis (optional A2A enrichment)",
+      "description": "Answer follow-up questions about the completed analysis with citations to obligation ids and policy section ids. When BBB_MCP_BEARER is set, also enriches with cited snippets from an external regulatory-corpus A2A gateway.",
+      "tags": ["qa", "citations", "a2a-consumer"],
+      "examples": [
+        "What is the priority of this amendment and which board committee should review it first?"
+      ]
+    },
+    {
+      "id": "reflector",
+      "name": "Reflector (low-confidence re-query)",
+      "description": "Reviews reconciled panel output; on low aggregate confidence or non-empty missing-evidence cues, queries Spanner Graph neighborhood (depth 2) for additional context. Falls back to A2A bridge when Spanner returns empty and the external bridge is enabled.",
+      "tags": ["reflection", "requery", "grounding", "spanner-graph"],
+      "examples": [
+        "Triage why obligation obl-c12-0 came back with confidence 0.42."
+      ]
+    }
+  ]
+}
