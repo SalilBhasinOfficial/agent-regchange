@@ -145,11 +145,23 @@ def ingest_two_pdfs(
     chunks_b = parse_pdf(pdf_path=pdf_b, doc_id=doc_b_id)
 
     # ---- 2) Graph extraction (deterministic clauses + optional LLM graph) ----
+    try:
+        from app.observability import progress as _progress
+
+        _progress.set_stage("Building regulatory graph", total=2, unit="document")
+    except Exception:  # noqa: BLE001
+        _progress = None  # type: ignore[assignment]
     extraction_a = extract_graph(chunks_a, doc_id=doc_a_id, namespace=namespace)
+    if _progress:
+        _progress.bump()
     extraction_b = extract_graph(chunks_b, doc_id=doc_b_id, namespace=namespace)
+    if _progress:
+        _progress.bump()
 
     # ---- 3) Persist to Spanner (unless dry_run) ----
     if not dry_run:
+        if _progress:
+            _progress.set_stage("Writing graph to Spanner", total=2, unit="document")
         backend = SpannerGraphBackend()
         backend.ingest_document(
             doc_id=doc_a_id,
@@ -160,6 +172,8 @@ def ingest_two_pdfs(
             raw_text=_raw_text_from_chunks(chunks_a),
             clauses=extraction_a.clauses,
         )
+        if _progress:
+            _progress.bump()
         backend.ingest_document(
             doc_id=doc_b_id,
             namespace=namespace,
@@ -169,6 +183,8 @@ def ingest_two_pdfs(
             raw_text=_raw_text_from_chunks(chunks_b),
             clauses=extraction_b.clauses,
         )
+        if _progress:
+            _progress.bump()
 
     # ---- 4) Build the AgentState ----
     amended_clauses = _amended_clauses_from_extraction(extraction_a, md_id=doc_b_id)

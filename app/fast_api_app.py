@@ -193,6 +193,8 @@ def launch_chain_run(
     pages_b = _pdf_pages(pdf_b_path)
     amendment_id = amendment_id or _normalize_doc_id(pdf_a_path.name)
 
+    import time as _time
+
     pipeline_run_id = begin_pipeline_run()
     with _RUNS_LOCK:
         _RUNS[pipeline_run_id] = {
@@ -203,6 +205,7 @@ def launch_chain_run(
             "error": None,
             "pages_a": pages_a,
             "pages_b": pages_b,
+            "started_at": _time.time(),
         }
 
     def _run_chain_background():
@@ -260,6 +263,16 @@ def launch_chain_run(
                 _RUNS[pipeline_run_id]["clauses_count"] = len(state.amended_clauses)
                 _RUNS[pipeline_run_id]["clauses_total"] = _clauses_total
                 _RUNS[pipeline_run_id]["status"] = "running_chain"
+            try:
+                from app.observability import progress as _prog
+
+                _prog.set_stage(
+                    "Four-lens debate panel",
+                    total=len(state.amended_clauses),
+                    unit="clause",
+                )
+            except Exception:  # noqa: BLE001
+                pass
 
             # Now run the chain proper (decompose → map → diff → judge → qna).
             from app.chain import run_chain  # late import — preserves offline path
@@ -423,27 +436,94 @@ def analyse_status(request: Request, run_id: str) -> HTMLResponse:
         return HTMLResponse(content='<p class="muted">Unknown run.</p>', status_code=404)
     status = entry["status"]
     if status == "done":
+        try:
+            from app.observability import progress as _prog
+
+            _prog.clear(run_id)
+        except Exception:  # noqa: BLE001
+            pass
         return HTMLResponse(
             content=f'<script>window.location="/impact/{run_id}";</script>'
             f'<p>Done — redirecting to impact view.</p>'
         )
     if status == "error":
+        try:
+            from app.observability import progress as _prog
+
+            _prog.clear(run_id)
+        except Exception:  # noqa: BLE001
+            pass
         err = entry.get("error", "unknown error")
         return HTMLResponse(content=f'<p class="muted">Error: {err}</p>')
-    clauses_count = entry.get("clauses_count") or 0
-    if clauses_count:
-        detail = (
-            f'Status: <strong>{status}</strong> · '
-            f'{clauses_count} amended clause(s) extracted · '
-            f'debate panel running. Poll every 3s…'
+
+    import time as _time
+
+    # ---- Live progress: stage, page count, parts done/total, ETA ----
+    try:
+        from app.observability import progress as _prog
+
+        prog = _prog.get(run_id)
+    except Exception:  # noqa: BLE001
+        prog = {}
+
+    pages_a = entry.get("pages_a") or 0
+    pages_b = entry.get("pages_b") or 0
+    pages_total = pages_a + pages_b
+    started_at = entry.get("started_at")
+    elapsed = int(_time.time() - started_at) if started_at else 0
+
+    stage = prog.get("stage") or {
+        "queued": "Queued",
+        "ingesting": "Ingesting documents",
+        "running_chain": "Four-lens debate panel",
+    }.get(status, status)
+    done = int(prog.get("done") or 0)
+    total = int(prog.get("total") or 0)
+    unit = prog.get("unit") or "step"
+    stage_started = prog.get("stage_started")
+
+    # Measured-rate ETA for the current stage: honest because it uses the
+    # observed throughput so far, not a hard-coded guess. Needs >=1 unit done.
+    eta_seconds = None
+    if total and done and stage_started:
+        stage_elapsed = max(0.001, _time.time() - stage_started)
+        rate = stage_elapsed / done  # seconds per unit
+        eta_seconds = int(rate * (total - done))
+
+    def _fmt(s: int) -> str:
+        m, sec = divmod(max(0, s), 60)
+        return f"{m}m {sec:02d}s" if m else f"{sec}s"
+
+    # Build the line(s).
+    parts: list[str] = [f'Stage: <strong>{stage}</strong>']
+    if total:
+        parts.append(f"{done}/{total} {unit}{'s' if total != 1 else ''}")
+    if pages_total:
+        parts.append(f"{pages_total} pages ({pages_a}+{pages_b})")
+    parts.append(f"elapsed {_fmt(elapsed)}")
+    line1 = " · ".join(parts)
+
+    eta_attr = ""
+    eta_line = ""
+    if eta_seconds is not None:
+        eta_epoch = _time.time() + eta_seconds
+        eta_attr = f' data-eta-epoch="{eta_epoch:.0f}"'
+        eta_line = (
+            f'<p class="muted">~ <span id="eta-countdown">{_fmt(eta_seconds)}</span> '
+            f'remaining (estimated from current speed)</p>'
         )
     else:
-        detail = (
-            f'Status: <strong>{status}</strong> · '
-            f'parsing PDFs and writing the regulatory graph to Spanner. '
-            f'Poll every 3s…'
+        eta_line = '<p class="muted">Estimating time remaining…</p>'
+
+    return HTMLResponse(
+        content=(
+            f'<div{eta_attr}>'
+            f"<p>{line1}</p>"
+            f"{eta_line}"
+            f'<p class="muted">Polling every 3s…</p>'
+            f"</div>"
         )
-    return HTMLResponse(content=f'<p>{detail}</p>')
+    )
 
 
 @app.get("/analyse/{run_id}", response_class=HTMLResponse)

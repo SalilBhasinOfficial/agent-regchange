@@ -8,6 +8,31 @@
   <p>Polling for completion…</p>
 </div>
 
+<script>
+  // Smooth per-second ETA countdown. The status fragment is swapped in every
+  // 3s and carries data-eta-epoch (absolute unix seconds); this document-level
+  // listener survives the swaps, re-syncing the timer on each refresh.
+  (function () {
+    var timer = null;
+    document.body.addEventListener("htmx:afterSwap", function (e) {
+      if (!e.target || e.target.id !== "status") return;
+      if (timer) { clearInterval(timer); timer = null; }
+      var holder = e.target.querySelector("[data-eta-epoch]");
+      var span = e.target.querySelector("#eta-countdown");
+      if (!holder || !span) return;
+      var epoch = parseFloat(holder.getAttribute("data-eta-epoch"));
+      if (!epoch) return;
+      function tick() {
+        var rem = Math.max(0, epoch - Date.now() / 1000);
+        var m = Math.floor(rem / 60), s = Math.floor(rem % 60);
+        span.textContent = m ? (m + "m " + (s < 10 ? "0" : "") + s + "s") : (s + "s");
+      }
+      tick();
+      timer = setInterval(tick, 1000);
+    });
+  })();
+</script>
+
 <h3>Live trace</h3>
 <div class="card">
   <p class="muted">Cloud Trace renders the four-lens parallel fan-out and the Reconciler/Reflector convergence:</p>

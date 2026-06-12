@@ -438,10 +438,25 @@ def parse_pdf(
         )
         page_count = max_pages
 
+    # Publish progress so the live-analysis UI can show stage + page-batch
+    # countdown instead of a static "ingesting" string. No-op offline.
+    try:
+        from app.observability import progress as _progress
+    except Exception:  # noqa: BLE001
+        _progress = None  # type: ignore[assignment]
+
     flat: list[dict[str, Any]] = []
     if page_count <= _ONLINE_PAGE_LIMIT:
+        if _progress:
+            _progress.set_stage(
+                f"Parsing {pdf_path.name} ({page_count} pages)",
+                total=1,
+                unit="page-batch",
+            )
         document = _process_bytes(client, resolved_processor, raw_bytes)
         flat = _document_to_flat(document)
+        if _progress:
+            _progress.bump()
     else:
         # Overlapping page batches so no block is truncated at a boundary.
         # ``step`` = pages each part *owns*; the part is processed with
@@ -471,6 +486,12 @@ def parse_pdf(
             page_count,
             len(parts),
         )
+        if _progress:
+            _progress.set_stage(
+                f"Parsing {pdf_path.name} ({page_count} pages)",
+                total=len(parts),
+                unit="page-batch",
+            )
 
         def _parse_part(spec: tuple[int, int, int]) -> list[dict[str, Any]]:
             primary_start, primary_end, process_end = spec
@@ -489,6 +510,8 @@ def parse_pdf(
                 primary_end,
                 len(kept),
             )
+            if _progress:
+                _progress.bump()
             return kept
 
         concurrency = max(1, int(os.environ.get("CURATOR_DOCAI_CONCURRENCY", "4")))
