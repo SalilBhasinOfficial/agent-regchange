@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Demos — Curator{% endblock %}
+{% block content %}
+<h1>Curated demos — Capital Adequacy domain</h1>
+<h2>Two real RBI document pairs, pre-analysed for instant viewing. Each result is
+<strong>cached</strong>; click <em>Re-run live</em> to watch the full agentic
+loop (Doc AI → Spanner Graph → 4-lens debate → judge) execute end-to-end.</h2>
+
+<div class="card" style="border-left:3px solid #76b900;">
+  <p class="mono-small muted">
+    Cached = a prior completed run, served from Spanner in milliseconds.
+    Re-run live = a fresh chain on the same documents (the 412-page Master
+    Direction is ingested from a pre-parsed sidecar; live re-parse is available
+    by unsetting fast-mode). Honest by design — no smoke, no mirrors.
+  </p>
+</div>
+
+{% for d in demos %}
+<div class="card">
+  <h3>{{ d.title }}</h3>
+  <p>{{ d.blurb }}</p>
+  <div class="grid-2">
+    <div class="stat"><span class="num" style="font-size:13px;color:#9fd0ff;">📄 {{ d.doc_a_label }}</span><span class="lbl">Amendment / newer</span></div>
+    <div class="stat"><span class="num" style="font-size:13px;color:#9fd0ff;">📘 {{ d.doc_b_label }}</span><span class="lbl">Master direction / baseline</span></div>
+  </div>
+  <div class="footer-actions">
+    {% if d.cached_run_id %}
+      <a class="btn" href="/impact/{{ d.cached_run_id }}">View cached result →</a>
+    {% else %}
+      <span class="pill stale">not cached yet</span>
+    {% endif %}
+    <form action="/demos/{{ d.id }}/run" method="post" style="display:inline">
+      <button type="submit" class="btn secondary">Re-run live ↻</button>
+    </form>
+  </div>
+</div>
+{% endfor %}
+
+<div class="footer-actions">
+  <a class="btn secondary" href="/inbox">Discovery Inbox →</a>
+  <a class="btn secondary" href="/">Upload your own pair →</a>
+</div>
+{% endblock %}

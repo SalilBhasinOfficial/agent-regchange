@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Discovery Inbox — Curator{% endblock %}
+{% block content %}
+<h1>Discovery Inbox</h1>
+<h2>Curator polls each configured regulator feed (RBI · SEBI · IRDAI by default) every 30 minutes, dedupes via Spanner, and queues the chain on every new item. Always-on, plug-and-play across jurisdictions.</h2>
+
+<div class="stat-row">
+  <div class="stat"><span class="num">{{ stats.total }}</span><span class="lbl">Discovered (all-time)</span></div>
+  <div class="stat"><span class="num">{{ stats.new }}</span><span class="lbl">Awaiting chain</span></div>
+  <div class="stat"><span class="num">{{ stats.processed }}</span><span class="lbl">Processed</span></div>
+  <div class="stat"><span class="num">{{ stats.last_poll }}</span><span class="lbl">Last poll</span></div>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>First seen</th>
+        <th>Title</th>
+        <th>Source</th>
+        <th>Status</th>
+        <th>Impact</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr>
+        <td class="mono-small">{{ item.first_seen }}</td>
+        <td>
+          <a class="title-cell" href="{{ item.url }}" target="_blank" rel="noopener">{{ item.title }}</a>
+          <div class="mono-small muted">{{ item.item_hash[:12] }}…</div>
+        </td>
+        <td><span class="pill">{{ item.source }}</span></td>
+        <td>
+          {% if item.status == 'done' %}<span class="pill full">done</span>
+          {% elif item.status == 'processing' %}<span class="pill partial">processing</span>
+          {% elif item.status == 'error' %}<span class="pill missing">error</span>
+          {% else %}<span class="pill">new</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if item.impact_priority %}<span class="pill {{ item.impact_priority }}">{{ item.impact_priority }}</span>{% else %}<span class="muted">—</span>{% endif %}
+        </td>
+        <td>
+          {% if item.pipeline_run_id %}
+            <a class="btn secondary" href="/impact/{{ item.pipeline_run_id }}">Open</a>
+          {% elif item.status in ('new', 'error') %}
+            <form action="/inbox/{{ item.item_hash }}/analyse" method="post" style="display:inline">
+              <button type="submit" class="btn">Analyse</button>
+            </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="muted">No items yet. The Discovery service writes here on the next Cloud Scheduler tick (every 30 min).</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<div class="footer-actions">
+  <form action="/inbox/poll" method="post" style="display:inline">
+    <button type="submit" class="btn secondary">Poll regulators now (manual)</button>
+  </form>
+  <a class="btn secondary" href="/">Or upload manually</a>
+</div>
+{% endblock %}

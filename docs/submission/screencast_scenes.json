@@ -1,0 +1,57 @@
+[
+  {
+    "title": "CURATOR",
+    "subtitle": "Autonomous regulatory-change intelligence for Indian BFSI  ·  Google ADK + Cloud Run + A2A",
+    "seconds": 5
+  },
+  {
+    "title": "The problem",
+    "subtitle": "Every fortnight an RBI / SEBI / IRDAI circular lands. One in three is material — 2 to 4 weeks of compliance-officer time. Curator does the proposal in minutes. Proposals only; a human always approves.",
+    "seconds": 8
+  },
+  {
+    "image": "docs/submission/scenes/00_demos.png",
+    "caption": "Curated capital-adequacy demos on REAL RBI documents — the Third Amendment and the credit-risk standardised approach, each read against the full 412-page consolidated Master Direction. Results are cached for instant viewing; evaluators can re-run the live agentic loop. Honest by design.",
+    "seconds": 15
+  },
+  {
+    "image": "docs/submission/scenes/03_analysing.png",
+    "caption": "Re-run live: the chain executes on Cloud Run — Doc AI / sidecar -> Spanner Graph (asia-south1) -> 4-lens decompose (banker / compliance / auditor / customer-protect) -> Reconciler -> Reflector -> 4-critic judge.",
+    "seconds": 14
+  },
+  {
+    "image": "docs/submission/scenes/04_impact.png",
+    "caption": "Board-ready output: atomic obligations, coverage gaps (full / partial / missing / stale / contradicts), concrete suggested edits, and an impact summary with downstream effects (ICAAP / Pillar-3 / RMC). Proposals only.",
+    "seconds": 13
+  },
+  {
+    "image": "docs/submission/scenes/05_perf.png",
+    "caption": "Transparent Performance panel — doc pages (85 + the full 412-page Master Direction), ingest vs debate-chain time, per-stage LLM calls / latency / cost, total estimated spend. Honest about the free-tier Vertex quota that bounds wall-clock. No black box; full JSON at /stats.",
+    "seconds": 15
+  },
+  {
+    "image": "docs/submission/scenes/02_inbox.png",
+    "caption": "Discovery Inbox — a standalone agent polls SEBI every 30 min (Cloud Scheduler -> Pub/Sub -> Spanner dedupe). 30 live circulars, always-on, each with a one-click Analyse.",
+    "seconds": 13
+  },
+  {
+    "image": "docs/submission/scenes/06_a2a_card.png",
+    "caption": "Every sub-agent is exposed as an A2A skill — the Track-3 protocol mandate, met live. Six skills on the deployed agent card.",
+    "seconds": 12
+  },
+  {
+    "image": "docs/submission/scenes/07_cost.png",
+    "caption": "Per-call USD cost tracking writes to Spanner; a live /cost endpoint rolls up spend by agent. We catch spend before the billing console does.",
+    "seconds": 11
+  },
+  {
+    "image": "docs/submission/architecture.png",
+    "caption": "Full topology: Cloud Run x 2, Spanner Graph in asia-south1, Doc AI, A2A skill card, Cloud Scheduler + Pub/Sub. Plug-and-play across regulators (SEBI / RBI / IRDAI / EU EBA / US SEC).",
+    "seconds": 13
+  },
+  {
+    "title": "Proposals only. Human in the loop. Every time.",
+    "subtitle": "40 Indian banks x Rs.15L/yr = Rs.6 Cr Year-1 addressable  ·  Apache 2.0  ·  Live on Cloud Run\ngithub.com/SalilBhasinOfficial/agent-regchange",
+    "seconds": 7
+  }
+]

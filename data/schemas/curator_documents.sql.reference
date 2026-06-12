@@ -1,0 +1,100 @@
+-- ============================================================================
+-- Curator Document Management (TimescaleDB)
+-- P3: Policy & SOP lifecycle management with approval workflows
+-- ============================================================================
+
+-- Tenant documents registry
+CREATE TABLE IF NOT EXISTS curator_tenant_documents (
+    doc_id              TEXT PRIMARY KEY,
+    tenant_id           TEXT NOT NULL,
+    doc_type            TEXT NOT NULL CHECK (doc_type IN ('policy','sop','committee_note','disclosure','minutes')),
+    title               TEXT NOT NULL,
+    owner_user_id       TEXT,
+    owner_department    TEXT,
+    current_version     INTEGER NOT NULL DEFAULT 1,
+    effective_date      DATE,
+    next_review_date    DATE,
+    regulatory_refs     TEXT,           -- JSON array of circular_ids
+    status              TEXT NOT NULL DEFAULT 'draft'
+                            CHECK (status IN ('draft','in_review','approved','published','superseded')),
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_curator_docs_tenant ON curator_tenant_documents (tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_curator_docs_type ON curator_tenant_documents (doc_type, status);
+CREATE INDEX IF NOT EXISTS idx_curator_docs_owner ON curator_tenant_documents (owner_user_id);
+CREATE INDEX IF NOT EXISTS idx_curator_docs_review ON curator_tenant_documents (next_review_date);
+
+-- Document versions (hypertable)
+CREATE TABLE IF NOT EXISTS curator_document_versions (
+    ts                      TIMESTAMPTZ NOT NULL,
+    doc_id                  TEXT NOT NULL,
+    version                 INTEGER NOT NULL,
+    content_ref             TEXT,       -- MinIO/S3 path or raw text for beta
+    diff_from_prev          TEXT,
+    change_summary          TEXT,
+    proposed_by_user_id     TEXT,
+    proposed_by_agent_session TEXT,     -- NULL if human
+    PRIMARY KEY (ts, doc_id, version)
+);
+
+SELECT create_hypertable('curator_document_versions', 'ts', if_not_exists => TRUE);
+
+CREATE INDEX IF NOT EXISTS idx_curator_doc_versions_doc ON curator_document_versions (doc_id, version DESC);
+
+-- Approval records (hypertable)
+CREATE TABLE IF NOT EXISTS curator_approvals (
+    ts              TIMESTAMPTZ NOT NULL,
+    approval_id     TEXT NOT NULL,
+    doc_id          TEXT NOT NULL,
+    version         INTEGER NOT NULL,
+    step_order      INTEGER NOT NULL,
+    approver_role   TEXT NOT NULL CHECK (approver_role IN ('maker','checker','committee','board')),
+    approver_user_id TEXT,
+    decision        TEXT NOT NULL DEFAULT 'pending'
+                        CHECK (decision IN ('pending','approved','rejected','requested_changes')),
+    decision_at     TIMESTAMPTZ,
+    comments        TEXT,
+    PRIMARY KEY (ts, approval_id)
+);
+
+SELECT create_hypertable('curator_approvals', 'ts', if_not_exists => TRUE);
+
+CREATE INDEX IF NOT EXISTS idx_curator_approvals_doc ON curator_approvals (doc_id, version);
+CREATE INDEX IF NOT EXISTS idx_curator_approvals_user ON curator_approvals (approver_user_id, decision);
+CREATE INDEX IF NOT EXISTS idx_curator_approvals_id ON curator_approvals (approval_id);
+
+-- Policy proposals from circular watcher (hypertable)
+CREATE TABLE IF NOT EXISTS curator_policy_proposals (
+    ts                      TIMESTAMPTZ NOT NULL,
+    proposal_id             TEXT NOT NULL,
+    tenant_id               TEXT NOT NULL,
+    source_circular_id      TEXT,
+    target_doc_id           TEXT,
+    diff                    TEXT,
+    rationale               TEXT,
+    affected_sops           TEXT,       -- JSON array
+    created_by_agent_session TEXT,
+    status                  TEXT NOT NULL DEFAULT 'pending'
+                                CHECK (status IN ('pending','approved','rejected')),
+    reviewed_by             TEXT,
+    reviewed_at             TIMESTAMPTZ,
+    PRIMARY KEY (ts, proposal_id)
+);
+
+SELECT create_hypertable('curator_policy_proposals', 'ts', if_not_exists => TRUE);
+
+CREATE INDEX IF NOT EXISTS idx_curator_proposals_tenant ON curator_policy_proposals (tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_curator_proposals_doc ON curator_policy_proposals (target_doc_id);
+CREATE INDEX IF NOT EXISTS idx_curator_proposals_circular ON curator_policy_proposals (source_circular_id);
+
+-- Watcher state (simple key-value for watermark)
+CREATE TABLE IF NOT EXISTS curator_watcher_state (
+    key         TEXT PRIMARY KEY,
+    last_ts     TIMESTAMPTZ NOT NULL DEFAULT '1970-01-01T00:00:00Z',
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO curator_watcher_state (key, last_ts) VALUES ('circular_watcher', '1970-01-01T00:00:00Z')
+ON CONFLICT (key) DO NOTHING;

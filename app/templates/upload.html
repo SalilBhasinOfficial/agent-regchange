@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Upload — Curator{% endblock %}
+{% block content %}
+<h1>Compare two regulatory documents</h1>
+<h2>Upload an amendment (PDF A) and the prior or master direction (PDF B). Curator's four-stakeholder-lens debate panel produces obligations, coverage gaps, suggested edits, and impact — typically in a few minutes on the demo fixture, faster on lighter notifications. Compare with 2–4 weeks of compliance-officer time per material amendment today.</h2>
+
+<div class="card">
+  <form action="/analyse" method="post" enctype="multipart/form-data">
+    <div class="grid-2">
+      <div>
+        <label for="pdf_a">PDF A — newer / amendment</label>
+        <input type="file" id="pdf_a" name="pdf_a" accept=".pdf" required>
+        <div class="hint">Typically the latest RBI / SEBI / IRDAI amendment notification.</div>
+      </div>
+      <div>
+        <label for="pdf_b">PDF B — older / master direction</label>
+        <input type="file" id="pdf_b" name="pdf_b" accept=".pdf" required>
+        <div class="hint">The prior amendment or the original master direction that this one modifies.</div>
+      </div>
+    </div>
+    <label for="namespace">Namespace</label>
+    <input type="text" id="namespace" name="namespace" value="demo" required>
+    <div class="hint">Tenant identifier — keeps each bank's ingested corpus isolated in Spanner Graph.</div>
+    <div class="footer-actions">
+      <button type="submit">Analyse</button>
+      <a class="btn secondary" href="/inbox">Or check the Discovery Inbox</a>
+    </div>
+  </form>
+</div>
+
+<h3>What happens next</h3>
+<div class="card">
+  <ol>
+    <li><strong>Document AI Layout Parser</strong> extracts structured chunks from both PDFs.</li>
+    <li><strong>Graph extractor</strong> derives clauses and writes them to <em>Spanner Graph</em> in asia-south1.</li>
+    <li><strong>Decompose panel</strong> — four stakeholder lenses (banker, compliance, auditor, customer-protect) extract obligations in parallel.</li>
+    <li><strong>Reconciler</strong> merges and surfaces cross-lens dissent.</li>
+    <li><strong>Map → diff → judge panel → Q&A</strong> finishes the chain.</li>
+    <li>Every step writes an <em>agent_runs</em> row for observability and Agent Optimizer training.</li>
+  </ol>
+  <p class="muted">Curator only proposes — every diff is reviewed and approved by a human compliance officer.</p>
+</div>
+{% endblock %}

@@ -1,0 +1,41 @@
+{
+  "amendment_id": "AMD-2026-capital-adequacy",
+  "master_direction_id": "MD-RBI-CAP-2025",
+  "title": "Amendment to the Master Direction on Prudential Norms on Capital Adequacy, 2025",
+  "notification_url": "https://website.rbi.org.in/web/rbi/-/notifications/AMD-2026-capital-adequacy",
+  "effective_date": "2026-10-01",
+  "amended_clauses": [
+    {
+      "clause_id": "MD-RBI-CAP-2025#11.5A",
+      "md_id": "MD-RBI-CAP-2025",
+      "heading": "Climate Risk Capital Buffer",
+      "old_text": null,
+      "new_text": "Every bank shall maintain an additional Climate Risk Capital Buffer of 0.25 per cent of RWAs in the form of CET1 capital, on an ongoing basis. The CRCB shall be phased in at 0.10 per cent of RWAs from October 1, 2026 and the full 0.25 per cent from April 1, 2027. The buffer shall be over and above the Capital Conservation Buffer.",
+      "change_type": "insert"
+    },
+    {
+      "clause_id": "MD-RBI-CAP-2025#7",
+      "md_id": "MD-RBI-CAP-2025",
+      "heading": "Quarterly ICAAP Refresh",
+      "old_text": "A bank's Board of Directors shall assess and document, at least once a year, whether the policies, procedures and limits remain appropriate.",
+      "new_text": "A bank's Board of Directors shall assess and document, at least once every calendar quarter and, additionally, immediately upon any material change in the bank's risk profile, whether the policies, procedures and limits remain appropriate.",
+      "change_type": "modify"
+    },
+    {
+      "clause_id": "MD-RBI-CAP-2025#6.iv",
+      "md_id": "MD-RBI-CAP-2025",
+      "heading": "Board reporting on climate-related concentration",
+      "old_text": null,
+      "new_text": "A bank shall have a Board-approved policy for assessment, monitoring and reporting of climate-related credit concentration in its loan book. The Risk Management Committee of the Board shall review such concentration at every meeting and the Board shall be apprised at least once every quarter.",
+      "change_type": "insert"
+    },
+    {
+      "clause_id": "MD-RBI-CAP-2025#6.iii",
+      "md_id": "MD-RBI-CAP-2025",
+      "heading": "Pillar 3 disclosure for the CRCB",
+      "old_text": "A bank shall have a formal disclosure policy approved by the Board of Directors covering Pillar 3 disclosures.",
+      "new_text": "A bank shall have a formal disclosure policy approved by the Board of Directors covering Pillar 3 disclosures, including disclosure of the Climate Risk Capital Buffer maintained by the bank with quantitative breakdown by exposure class, effective from the financial year 2027-28.",
+      "change_type": "modify"
+    }
+  ]
+}

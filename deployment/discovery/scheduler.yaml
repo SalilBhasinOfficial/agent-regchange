@@ -1,0 +1,51 @@
+# Cloud Scheduler job template — Curator Discovery service.
+#
+# This file is documentation only. Cloud Scheduler does not natively
+# consume YAML; the canonical creation path is the gcloud CLI command
+# documented under "Apply" below. Keep this file in sync with the
+# command so anyone reading the repo sees the authoritative schedule.
+#
+# Schedule: every 30 minutes. The RBI feed updates infrequently; 30m
+# is fast enough to surface notifications within a regulatory work
+# session and slow enough to stay inside the discovery service's
+# minimum-instance idle budget.
+#
+# Auth: OIDC token signed by the Curator service account. Cloud Run
+# verifies the token and rejects unauthenticated invocations.
+
+name: curator-discovery-poll
+description: |
+  Triggers the Curator discovery service's /poll endpoint every 30
+  minutes. New RBI notifications are deduped against Spanner and
+  fanned out to Pub/Sub topic curator-discoveries.
+schedule: "*/30 * * * *"
+time_zone: "Asia/Kolkata"
+http_target:
+  uri: "https://<discovery-service-url>/poll"   # replaced at deploy time
+  http_method: POST
+  oidc_token:
+    service_account_email: "curator-ai-engine@curator-research.iam.gserviceaccount.com"
+    audience: "https://<discovery-service-url>/poll"
+retry_config:
+  retry_count: 3
+  min_backoff_duration: 30s
+  max_backoff_duration: 5m
+
+# ---------------------------------------------------------------------------
+# Apply (D6 deploy step). Substitute the URL emitted by `adk deploy`:
+#
+#   DISCOVERY_URL="$(gcloud run services describe curator-discovery \
+#       --region=asia-south1 --project=curator-research \
+#       --format='value(status.url)')"
+#
+#   gcloud scheduler jobs create http curator-discovery-poll \
+#     --location=asia-south1 \
+#     --schedule="*/30 * * * *" \
+#     --time-zone="Asia/Kolkata" \
+#     --uri="${DISCOVERY_URL}/poll" \
+#     --http-method=POST \
+#     --oidc-service-account-email="curator-ai-engine@curator-research.iam.gserviceaccount.com" \
+#     --oidc-token-audience="${DISCOVERY_URL}/poll" \
+#     --attempt-deadline=180s \
+#     --project=curator-research
+# ---------------------------------------------------------------------------

@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Impact — {{ state.amendment.title or state.amendment.amendment_id }}{% endblock %}
+{% block content %}
+<h1>{{ state.amendment.title or state.amendment.amendment_id }}</h1>
+<h2>Pipeline run <code>{{ pipeline_run_id }}</code> · {{ state.amendment.effective_date or '' }}</h2>
+
+<div class="stat-row">
+  {% if state.param_changes %}<div class="stat"><span class="num">{{ state.param_changes | length }}</span><span class="lbl">Parameter changes</span></div>{% endif %}
+  <div class="stat"><span class="num">{{ state.obligations | length }}</span><span class="lbl">Obligations</span></div>
+  <div class="stat"><span class="num">{{ missing_count }}</span><span class="lbl">Missing coverage</span></div>
+  <div class="stat"><span class="num">{{ state.diffs | length }}</span><span class="lbl">Suggested edits</span></div>
+  <div class="stat"><span class="num"><span class="pill {{ state.impact.priority }}">{{ state.impact.priority }}</span></span><span class="lbl">Priority</span></div>
+</div>
+
+<div class="card {{ state.impact.priority }}">
+  <h3>Impact summary</h3>
+  <p>{{ state.impact.summary }}</p>
+  <div class="grid-2">
+    <div>
+      <h3>Affected departments</h3>
+      <ul>{% for d in state.impact.affected_departments %}<li>{{ d }}</li>{% endfor %}</ul>
+    </div>
+    <div>
+      <h3>Downstream effects</h3>
+      <ul>{% for e in state.impact.downstream_effects %}<li>{{ e }}</li>{% endfor %}</ul>
+    </div>
+  </div>
+  <p class="mono-small muted">Confidence: {{ '%.2f' % state.impact.confidence }} · Impact score: {{ '%.2f' % state.impact.impact_score }}</p>
+</div>
+
+{% if state.param_changes %}
+<h3>Quantitative changes — {{ state.amendment.title }} vs {{ state.comparison_title or 'prior framework' }}</h3>
+<div class="card">
+  <p class="hint">Old → new movement of each regulatory parameter, with effect on RWA / CRAR. The diff a compliance officer actually needs — proposals for review, not advice.</p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Parameter</th><th>Exposure class</th><th>Old</th><th>New</th><th>Δ</th><th>Effective</th><th>CRAR impact</th></tr>
+      </thead>
+      <tbody>
+        {% for p in state.param_changes %}
+        <tr>
+          <td>
+            <strong>{{ p.parameter }}</strong>
+            {% if p.source_new or p.source_old %}<div class="mono-small muted">{{ p.source_new or '' }}{% if p.source_old %} ← {{ p.source_old }}{% endif %}</div>{% endif %}
+            {% if p.notes %}<div class="mono-small muted">{{ p.notes }}</div>{% endif %}
+          </td>
+          <td>{{ p.exposure_class or '—' }}</td>
+          <td class="mono-small">{{ p.old_value or '—' }}</td>
+          <td class="mono-small"><strong>{{ p.new_value }}</strong>{% if p.unit %} <span class="muted">{{ p.unit }}</span>{% endif %}</td>
+          <td><span class="pill {% if p.direction == 'increase' %}high{% elif p.direction == 'decrease' %}full{% elif p.direction == 'new' %}missing{% else %}partial{% endif %}">{{ p.direction }}</span></td>
+          <td class="mono-small">{{ p.effective_date or '—' }}</td>
+          <td class="mono-small">{{ p.crar_impact or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% if run_stats %}
+<h3>Performance — this run</h3>
+<div class="card">
+  <div class="stat-row">
+    <div class="stat"><span class="num">{{ run_stats.pages_a if run_stats.pages_a is not none else '–' }}</span><span class="lbl">Pages · Doc A</span></div>
+    <div class="stat"><span class="num">{{ run_stats.pages_b if run_stats.pages_b is not none else '–' }}</span><span class="lbl">Pages · Doc B</span></div>
+    <div class="stat"><span class="num">{{ run_stats.ingest_seconds }}s</span><span class="lbl">Ingest (Doc AI + graph)</span></div>
+    <div class="stat"><span class="num">{{ run_stats.chain_seconds }}s</span><span class="lbl">Debate chain</span></div>
+    <div class="stat"><span class="num">{{ run_stats.total_seconds }}s</span><span class="lbl">Total TAT</span></div>
+  </div>
+  <p class="mono-small muted">Model: <strong>{{ run_stats.model }}</strong> · {{ run_stats.clauses }} clauses → {{ run_stats.obligations }} obligations → {{ run_stats.diffs }} edits</p>
+  {% if run_stats.breakdown and run_stats.breakdown.available %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Stage</th><th>LLM calls</th><th>Total time</th><th>Avg / call</th><th>Cost (est.)</th></tr></thead>
+      <tbody>
+        {% for s in run_stats.breakdown.stages %}
+        <tr>
+          <td>{{ s.stage }}</td>
+          <td>{{ s.calls }}</td>
+          <td class="mono-small">{{ '%.1f' % (s.total_ms / 1000) }}s</td>
+          <td class="mono-small">{{ '%.1f' % (s.avg_ms / 1000) }}s</td>
+          <td class="mono-small">${{ '%.5f' % s.cost_usd }}</td>
+        </tr>
+        {% endfor %}
+        <tr>
+          <td><strong>Total</strong></td>
+          <td><strong>{{ run_stats.breakdown.totals.calls }}</strong></td>
+          <td class="mono-small"><strong>{{ run_stats.breakdown.chain_wall_clock_s }}s wall-clock</strong></td>
+          <td class="mono-small">—</td>
+          <td class="mono-small"><strong>${{ '%.5f' % run_stats.breakdown.totals.cost_usd }}</strong></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="hint">LLM calls run concurrently (ThreadPoolExecutor), so summed call-time exceeds wall-clock. Full JSON at <code>/stats/{{ pipeline_run_id }}</code>.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+<h3>Obligations × Coverage</h3>
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Obligation</th><th>Deontic</th><th>Owner</th><th>Coverage</th><th>Confidence</th></tr>
+      </thead>
+      <tbody>
+        {% for obl in state.obligations %}
+        {% set m = matches_by_obl.get(obl.id) %}
+        <tr>
+          <td>
+            <strong>{{ obl.action }}</strong>
+            <div class="mono-small muted">{{ obl.id }} · {{ obl.source_clause_id }}{% if obl.temporal_scope %} · {{ obl.temporal_scope }}{% endif %}</div>
+          </td>
+          <td><span class="pill">{{ obl.deontic_type.value if obl.deontic_type.value is defined else obl.deontic_type }}</span></td>
+          <td>{{ obl.owner_hint or '—' }}</td>
+          <td>
+            {% if m %}<span class="pill {{ m.coverage }}">{{ m.coverage }}</span>
+            {% if m.policy_section_id %}<div class="mono-small muted">{{ m.policy_section_id }}</div>{% endif %}
+            {% else %}<span class="muted">—</span>{% endif %}
+          </td>
+          <td class="mono-small">{{ '%.2f' % obl.confidence }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if state.diffs %}
+<h3>Suggested edits ({{ state.diffs | length }})</h3>
+{% for d in state.diffs %}
+<div class="card">
+  <h3>{{ d.policy_section_id }}</h3>
+  <p>{{ d.rationale }}</p>
+  <pre class="diff">{% if d.current_text %}<span class="del">{{ d.current_text }}</span>
+{% endif %}<span class="add">{{ d.suggested_text }}</span></pre>
+  <p class="mono-small muted">Related: {{ d.related_obligation_ids | join(', ') }} · Confidence: {{ '%.2f' % d.confidence }}</p>
+</div>
+{% endfor %}
+{% endif %}
+
+<h3>Ask a follow-up question</h3>
+<div class="card">
+  <form hx-post="/qna/{{ pipeline_run_id }}" hx-target="#qna-results" hx-swap="beforeend">
+    <input type="text" name="question" placeholder="e.g. Which obligations have no internal policy coverage?" required>
+    <div class="footer-actions">
+      <button type="submit">Ask</button>
+    </div>
+  </form>
+  <div id="qna-results"></div>
+</div>
+
+<div class="footer-actions">
+  <a class="btn secondary" href="/inbox">← Inbox</a>
+  <a class="btn secondary" href="/">Upload another</a>
+</div>
+{% endblock %}
