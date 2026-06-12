@@ -314,31 +314,39 @@ def launch_chain_run(
                 state.impact = real_judge(
                     state.obligations, state.matches, state.diffs, state.param_changes
                 )
-                # Compliance + internal-audit control gate before publishing.
+                # Compliance + internal-audit gate, with findings looped back to
+                # finalize the report (true-and-fair) and a re-audit to confirm.
                 try:
-                    from app.sub_agents.audit import real_audit
+                    from app.sub_agents.finalize import review_and_finalize
 
                     with _RUNS_LOCK:
                         _RUNS[pipeline_run_id]["status"] = "auditing"
                     try:
                         from app.observability import progress as _prog
 
-                        _prog.set_stage("Compliance + internal-audit review", total=1, unit="review")
+                        _prog.set_stage(
+                            "Compliance + internal-audit review → finalize",
+                            total=1,
+                            unit="review",
+                        )
                     except Exception:  # noqa: BLE001
                         pass
-                    state.audit = real_audit(state)
+                    review_and_finalize(state)
                     try:
                         _prog.bump()
                     except Exception:  # noqa: BLE001
                         pass
-                except Exception:  # noqa: BLE001 — audit is a gate, never fail the run
+                except Exception:  # noqa: BLE001 — gate, never fail the run
                     import logging as _logging
 
-                    _logging.getLogger(__name__).warning("audit stage failed; continuing")
+                    _logging.getLogger(__name__).warning(
+                        "audit/finalize stage failed; continuing"
+                    )
             else:
                 from app.sub_agents.audit import stub_audit
                 from app.sub_agents.decompose import stub_decompose
                 from app.sub_agents.diff import stub_diff
+                from app.sub_agents.finalize import stub_finalize
                 from app.sub_agents.judge import stub_judge
                 from app.sub_agents.map_ import stub_map
 
@@ -347,6 +355,7 @@ def launch_chain_run(
                 state.diffs = stub_diff(state.matches, state.obligations, state.policies)
                 state.impact = stub_judge(state.obligations, state.matches, state.diffs)
                 state.audit = stub_audit(state)
+                state.finalization = stub_finalize(state)
 
             _t_done = _time.monotonic()
             with _RUNS_LOCK:

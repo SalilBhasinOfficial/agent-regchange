@@ -271,6 +271,34 @@ class AuditReport(BaseModel):
     confidence: float = Field(default=0.7, ge=0.0, le=1.0)
 
 
+class Finalization(BaseModel):
+    """The report after the audit's observations are looped back in.
+
+    The finalizer applies the compliance + internal-audit findings to the
+    assembled package so the published report is *true and fair*: it excludes
+    parameter rows the audit deemed not genuine, corrects an inconsistent
+    priority, and states a balanced final view that acknowledges the audit's
+    caveats. Applied deterministically by the chain, then re-audited once.
+    """
+
+    excluded_parameters: list[str] = Field(
+        default_factory=list,
+        description="Parameter names the audit deemed not real changes (TOC/heading/page-number noise, old==new). Dropped from the final report.",
+    )
+    corrected_priority: Literal["low", "medium", "high", "critical"] | None = Field(
+        default=None,
+        description="Revised overall priority if the audit found the judge's priority unsupported. None = keep.",
+    )
+    true_and_fair_summary: str = Field(
+        description="The finalized, balanced summary that incorporates the audit's observations.",
+    )
+    changes_made: list[str] = Field(
+        default_factory=list,
+        description="What was reconciled in response to the audit (for the change record).",
+    )
+    confidence: float = Field(default=0.7, ge=0.0, le=1.0)
+
+
 # ----- the shared state ----------------------------------------------------
 
 
@@ -298,6 +326,9 @@ class AgentState(BaseModel):
     # Compliance + internal-audit review of the assembled package — the
     # automated control gate before a human approves / publishes.
     audit: "AuditReport | None" = None
+    # The report after the audit's observations are looped back and applied —
+    # the "true and fair" finalization.
+    finalization: "Finalization | None" = None
     qna_history: list[QnATurn] = Field(default_factory=list)
     confidence_log: dict[str, float] = Field(
         default_factory=dict,

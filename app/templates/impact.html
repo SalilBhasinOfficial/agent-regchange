@@ -40,6 +40,22 @@
 </div>
 {% endif %}
 
+{% if state.finalization and state.finalization.changes_made %}
+<div class="card">
+  <h3>Finalized report — true &amp; fair view</h3>
+  <p>{{ state.finalization.true_and_fair_summary }}</p>
+  {% if state.finalization.changes_made %}
+  <p class="muted">Reconciled in response to the audit:</p>
+  <ul>
+    {% for c in state.finalization.changes_made %}<li>{{ c }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+  {% if state.finalization.excluded_parameters %}
+  <p class="muted">Excluded {{ state.finalization.excluded_parameters | length }} non-genuine parameter row(s) flagged by audit.</p>
+  {% endif %}
+</div>
+{% endif %}
+
 {% if state.policies | length == 0 %}
 <div class="card amber">
   <p><strong>Single-document triage.</strong> No internal policy corpus was loaded

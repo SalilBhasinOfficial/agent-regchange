@@ -72,3 +72,38 @@ def test_title_skips_materialised_table():
 def test_title_falls_back_when_no_real_heading():
     chunks = [_chunk("Index", layout="heading-1")]
     assert _title_from_chunks(chunks, "the-fallback") == "the-fallback"
+
+
+def test_apply_finalization_drops_excluded_and_corrects():
+    from app.models import (
+        AgentState,
+        AmendmentInput,
+        Finalization,
+        ImpactSummary,
+        ParameterChange,
+    )
+    from app.sub_agents.finalize import apply_finalization
+
+    st = AgentState(
+        amendment=AmendmentInput(
+            amendment_id="x", master_direction_id="y", title="T", raw_text="r"
+        )
+    )
+    st.param_changes = [
+        ParameterChange(parameter="Table of Contents", old_value=None, new_value="5", direction="new"),
+        ParameterChange(parameter="Equity RW", old_value="125%", new_value="250%", direction="increase"),
+    ]
+    st.impact = ImpactSummary(impact_score=0.9, priority="critical", summary="old")
+    apply_finalization(
+        st,
+        Finalization(
+            excluded_parameters=["Table of Contents"],
+            corrected_priority="high",
+            true_and_fair_summary="Balanced final view.",
+            changes_made=["Excluded TOC row"],
+        ),
+    )
+    assert [p.parameter for p in st.param_changes] == ["Equity RW"]
+    assert st.impact.priority == "high"
+    assert st.impact.summary == "Balanced final view."
+    assert st.finalization is not None
