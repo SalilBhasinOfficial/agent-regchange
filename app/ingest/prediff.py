@@ -157,38 +157,44 @@ class PrediffResult:
             f"{self.removed} removed → {self.changed_new} reach the LLM"
         )
 
-    def changed_blob(self, max_chars: int) -> str:
-        """Render the deltas as aligned old→new pairs for a diff LLM call.
+    def ordered_changes(self) -> list[ParaChange]:
+        """Changes ordered modified → added → removed.
 
-        Ordering matters under the character cap: ``modified`` and ``added``
-        carry the new_value the parameter-diff extracts, so they go FIRST and
-        ``removed`` (prior-only text — for a cross-framework pair this is
-        mostly noise, for a version diff it flags withdrawals) goes LAST. When
-        the blob is truncated it therefore drops removed paragraphs before any
-        aligned old→new pair.
+        ``modified`` / ``added`` carry the new_value the parameter-diff
+        extracts, so they come first; ``removed`` (prior-only text — noise for
+        a cross-framework pair, a withdrawal flag for a version diff) comes
+        last, so any truncation/batching drops removed before aligned pairs.
         """
-        ordered = (
+        return (
             [c for c in self.changes if c.kind == "modified"]
             + [c for c in self.changes if c.kind == "added"]
             + [c for c in self.changes if c.kind == "removed"]
         )
-        out: list[str] = []
-        for n, c in enumerate(ordered):
-            if c.kind == "removed":
-                block = f"[CHANGE {n + 1}] REMOVED\nPRIOR: {c.old_text}"
-            elif c.kind == "added":
-                block = f"[CHANGE {n + 1}] ADDED (new in this framework)\nNEW: {c.new_text}"
-            else:  # modified
-                block = (
-                    f"[CHANGE {n + 1}] MODIFIED\n"
-                    f"PRIOR: {c.old_text}\n"
-                    f"NEW:   {c.new_text}"
-                )
-            out.append(block)
-        blob = "\n\n".join(out)
+
+    def changed_blob(self, max_chars: int) -> str:
+        """Render all deltas as aligned old→new pairs for a diff LLM call."""
+        blob = render_change_blocks(self.ordered_changes())
         if len(blob) > max_chars:
             blob = blob[:max_chars] + "\n\n[...further changes truncated...]"
         return blob
+
+
+def render_change_blocks(changes: list[ParaChange]) -> str:
+    """Render a list of ParaChange as numbered old→new blocks for an LLM."""
+    out: list[str] = []
+    for n, c in enumerate(changes):
+        if c.kind == "removed":
+            block = f"[CHANGE {n + 1}] REMOVED\nPRIOR: {c.old_text}"
+        elif c.kind == "added":
+            block = f"[CHANGE {n + 1}] ADDED (new in this framework)\nNEW: {c.new_text}"
+        else:  # modified
+            block = (
+                f"[CHANGE {n + 1}] MODIFIED\n"
+                f"PRIOR: {c.old_text}\n"
+                f"NEW:   {c.new_text}"
+            )
+        out.append(block)
+    return "\n\n".join(out)
 
 
 def _mode() -> str:

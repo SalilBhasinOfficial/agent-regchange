@@ -144,6 +144,54 @@ def load_pipeline_run(pipeline_run_id: str) -> dict[str, Any] | None:
     }
 
 
+def list_done_runs(limit: int = 50) -> list[dict[str, Any]]:
+    """Recent completed runs for the public gallery, newest first.
+
+    Returns one row per *latest* completed run per amendment_id (so the same
+    document analysed twice shows once). Best-effort: returns [] when Spanner
+    is unavailable.
+
+    Note: there is no per-tenant namespace column yet, so this lists every
+    completed run. For multi-tenant production the gallery must filter to a
+    public/published namespace — today all rows are curated RBI analyses.
+    """
+    database = _get_database()
+    if database is None:
+        return []
+    try:
+        with database.snapshot() as snap:
+            rows = list(
+                snap.execute_sql(
+                    "SELECT pipeline_run_id, ts, amendment_id, clauses_count, "
+                    "total_cost_usd, stats_json FROM pipeline_runs "
+                    "WHERE status='done' ORDER BY ts DESC LIMIT @lim",
+                    params={"lim": limit},
+                    param_types=_int_param_types("lim"),
+                )
+            )
+    except Exception as e:  # noqa: BLE001
+        LOGGER.warning("list_done_runs failed: %s", e)
+        return []
+    seen: set[str] = set()
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        amendment_id = r[2]
+        if amendment_id in seen:
+            continue
+        seen.add(amendment_id)
+        out.append(
+            {
+                "pipeline_run_id": r[0],
+                "ts": r[1].isoformat() if r[1] else None,
+                "amendment_id": amendment_id,
+                "clauses_count": r[3],
+                "total_cost_usd": r[4],
+                "stats_json": r[5] if len(r) > 5 else None,
+            }
+        )
+    return out
+
+
 def latest_done_run(amendment_id: str) -> str | None:
     """Most-recent completed pipeline_run_id for an amendment_id, or None."""
     database = _get_database()

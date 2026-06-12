@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Gallery — Curator{% endblock %}
+{% block content %}
+<h1>Completed analyses</h1>
+<p class="muted">
+  Browsable results from finished runs — open any one instantly, no re-run and
+  no quota used. Each is a board-ready impact assessment on a real regulatory
+  document.
+</p>
+
+{% if runs %}
+<div class="grid-2">
+  {% for r in runs %}
+  <a class="card" href="/impact/{{ r.pipeline_run_id }}" style="display:block;text-decoration:none;">
+    <h3 style="margin-top:0;">{{ r.amendment_id }}</h3>
+    <p class="muted" style="margin:4px 0;">
+      {% if r.date %}{{ r.date }} · {% endif %}run <code>{{ r.pipeline_run_id[:12] }}…</code>
+    </p>
+    <p style="margin:8px 0;">
+      {% if r.obligations is not none %}<strong>{{ r.obligations }}</strong> obligations · {% endif %}
+      {% if r.param_changes is not none %}<strong>{{ r.param_changes }}</strong> parameter changes · {% endif %}
+      {{ r.clauses_count }} clauses
+    </p>
+    {% if r.cost_usd is not none %}
+    <p class="muted" style="margin:4px 0;">≈ ${{ '%.4f'|format(r.cost_usd) }} compute</p>
+    {% endif %}
+    <p><span class="btn secondary">Open impact assessment →</span></p>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card amber">
+  <p>No completed analyses are available yet. Run one from
+    <a href="/demos">Demos</a> or <a href="/">Upload</a>, and it will appear here
+    once finished.</p>
+  <p class="muted">(The gallery reads completed runs from Spanner; it is empty
+    when Spanner is offline or no run has finished.)</p>
+</div>
+{% endif %}
+
+<div class="footer-actions">
+  <a class="btn secondary" href="/demos">Demos</a>
+  <a class="btn secondary" href="/inbox">Inbox</a>
+</div>
+{% endblock %}

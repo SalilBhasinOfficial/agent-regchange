@@ -740,6 +740,48 @@ def inbox(request: Request) -> HTMLResponse:
     )
 
 
+@app.get("/gallery", response_class=HTMLResponse)
+def gallery(request: Request) -> HTMLResponse:
+    """Public gallery of completed analyses — browsable results, no re-run.
+
+    Lists completed pipeline runs (newest first, one per amendment) so
+    evaluators can open finished impact assessments instantly without
+    triggering a live, quota-consuming run. Each card parses ``stats_json``
+    for headline counts (obligations, parameter changes).
+    """
+    import json as _json
+
+    runs: list[dict] = []
+    try:
+        from app.observability.pipeline_store import list_done_runs
+
+        for row in list_done_runs(limit=50):
+            stats = {}
+            if row.get("stats_json"):
+                try:
+                    stats = _json.loads(row["stats_json"])
+                except Exception:  # noqa: BLE001
+                    stats = {}
+            ts = row.get("ts") or ""
+            runs.append(
+                {
+                    "pipeline_run_id": row["pipeline_run_id"],
+                    "amendment_id": row.get("amendment_id") or "(untitled)",
+                    "date": ts[:10] if ts else "",
+                    "clauses_count": row.get("clauses_count") or 0,
+                    "obligations": stats.get("obligations"),
+                    "param_changes": stats.get("param_changes"),
+                    "cost_usd": row.get("total_cost_usd"),
+                }
+            )
+    except Exception:  # noqa: BLE001 — gallery is best-effort
+        runs = []
+    return templates.TemplateResponse(
+        "gallery.html",
+        {"request": request, "runs": runs},
+    )
+
+
 @app.post("/inbox/poll")
 def inbox_poll_manual() -> RedirectResponse:
     """Manual trigger: poll every configured regulator source now.

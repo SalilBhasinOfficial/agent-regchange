@@ -80,11 +80,66 @@ def _coerce(text: str, output_schema: Any) -> Any:
     try:
         parsed = json.loads(payload)
     except json.JSONDecodeError as e:
-        raise RunnerError(f"agent output is not valid JSON: {e}; got: {payload[:200]}") from e
+        # Salvage: a JSON array truncated mid-row (the model hit its output
+        # token ceiling) loses the ENTIRE extraction otherwise. Recover the
+        # valid prefix — every complete object before the truncation point.
+        salvaged = _salvage_truncated_array(payload)
+        if salvaged is not None:
+            try:
+                parsed = json.loads(salvaged)
+            except json.JSONDecodeError:
+                raise RunnerError(
+                    f"agent output is not valid JSON: {e}; got: {payload[:200]}"
+                ) from e
+        else:
+            raise RunnerError(
+                f"agent output is not valid JSON: {e}; got: {payload[:200]}"
+            ) from e
     try:
         return TypeAdapter(output_schema).validate_python(parsed)
     except ValidationError as e:
         raise RunnerError(f"agent output did not match schema {output_schema}: {e}") from e
+
+
+def _salvage_truncated_array(payload: str) -> str | None:
+    """Recover the complete-object prefix of a truncated JSON array.
+
+    When a model emits a JSON array of objects and runs out of output tokens,
+    the trailing object is cut mid-string and ``json.loads`` rejects the whole
+    thing. We walk the text tracking brace depth (ignoring braces inside
+    strings) and close the array after the last top-level object that fully
+    completed, so all complete rows survive. Returns None if the payload is
+    not an array or no complete object was found.
+    """
+    s = payload.lstrip()
+    if not s.startswith("["):
+        return None
+    depth = 0
+    in_str = False
+    esc = False
+    last_complete = None
+    for i, ch in enumerate(s):
+        if esc:
+            esc = False
+            continue
+        if in_str:
+            if ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch in "[{":
+            depth += 1
+        elif ch in "]}":
+            depth -= 1
+            if depth == 1 and ch == "}":
+                # A top-level object (inside the outer array) just closed.
+                last_complete = i
+    if last_complete is None:
+        return None
+    return s[: last_complete + 1] + "]"
 
 
 async def _run_once_async(agent, user_text: str) -> str:

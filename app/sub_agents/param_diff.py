@@ -68,6 +68,10 @@ Rules:
   * Quote actual numbers from the text. NEVER invent a value. If the prior
     value is genuinely not stated in the PRIOR FRAMEWORK text provided, set
     old_value to null, direction to "new", and say so in notes.
+  * Emit a row ONLY when a value actually MOVED (direction increase, decrease,
+    new, removed, or restructured). DO NOT emit rows where old_value equals
+    new_value or direction would be "unchanged" — those waste the response and
+    are not changes. If nothing in a batch moved, return an empty list [].
   * Prefer many precise rows over a few vague ones. A real credit-risk
     standardised-approach change has dozens of risk-weight movements.
   * Do not emit obligations or policy edits here — only parameter movements.
@@ -139,35 +143,49 @@ def real_param_diff(
     # Pre-diff gate: instead of dumping two full documents (which forces the
     # model to hunt for changes and blows the output-token budget), do the
     # paragraph alignment in plain Python first and feed the model only the
-    # aligned old→new deltas. Smaller input → no JSON truncation, lower cost,
-    # and the model sees pairs rather than haystacks. Disable with
-    # CURATOR_PREDIFF=0 to restore the full-document behavior.
+    # aligned old→new deltas, IN BATCHES. Batching bounds the OUTPUT size: a
+    # large cross-framework diff yields hundreds of ParameterChange rows that
+    # cannot fit in one ~64K-token response, truncating the JSON mid-array and
+    # losing everything. Each batch emits a bounded number of rows that
+    # serialise cleanly; results are concatenated. Disable with CURATOR_PREDIFF=0.
     if os.environ.get("CURATOR_PREDIFF", "1") != "0":
         import logging
 
-        from app.ingest.prediff import prediff, split_paragraphs
+        from app.ingest.prediff import prediff, render_change_blocks, split_paragraphs
 
-        result = prediff(
-            split_paragraphs(comparison_text),
-            split_paragraphs(new_full),
-        )
-        logging.getLogger(__name__).info("param_diff: %s", result.summary())
-        changed_blob = result.changed_blob(max_chars)
-        if changed_blob.strip():
-            prompt = (
-                f"NEW FRAMEWORK — {new_title}\n"
-                f"PRIOR FRAMEWORK — {comparison_title or 'consolidated / earlier framework'}\n"
-                f"=================================================\n"
-                f"The paragraphs below are ONLY the regions that changed between the\n"
-                f"prior and new framework, already aligned old→new (unchanged text has\n"
-                f"been removed in a deterministic pre-pass). Extract every quantitative\n"
-                f"parameter movement from these changes per your instructions.\n"
-                f"=================================================\n"
-                f"{changed_blob}\n\n"
-                f"Now produce the exhaustive ParameterChange table."
-            )
+        log = logging.getLogger(__name__)
+        result = prediff(split_paragraphs(comparison_text), split_paragraphs(new_full))
+        log.info("param_diff: %s", result.summary())
+        changes = result.ordered_changes()
+        if changes:
+            batch_size = int(os.environ.get("CURATOR_PARAM_DIFF_BATCH", "60"))
             agent = build_agent()
-            return run_agent(agent, prompt, output_schema=list[ParameterChange])
+            all_changes: list[ParameterChange] = []
+            n_batches = (len(changes) + batch_size - 1) // batch_size
+            for bi in range(n_batches):
+                batch = changes[bi * batch_size : (bi + 1) * batch_size]
+                blob = render_change_blocks(batch)[:max_chars]
+                prompt = (
+                    f"NEW FRAMEWORK — {new_title}\n"
+                    f"PRIOR FRAMEWORK — "
+                    f"{comparison_title or 'consolidated / earlier framework'}\n"
+                    f"=================================================\n"
+                    f"The blocks below are batch {bi + 1} of {n_batches} of ONLY the\n"
+                    f"regions that changed between the prior and new framework, already\n"
+                    f"aligned old→new (unchanged text removed in a deterministic pre-pass).\n"
+                    f"Extract every quantitative parameter movement per your instructions.\n"
+                    f"=================================================\n"
+                    f"{blob}\n\n"
+                    f"Produce the ParameterChange rows for THIS batch only."
+                )
+                try:
+                    rows = run_agent(agent, prompt, output_schema=list[ParameterChange])
+                    all_changes.extend(rows)
+                except Exception as exc:  # noqa: BLE001 — one bad batch ≠ lost run
+                    log.warning("param_diff batch %d/%d failed: %s", bi + 1, n_batches, exc)
+            log.info("param_diff: %d parameter changes across %d batch(es).",
+                     len(all_changes), n_batches)
+            return all_changes
         # Fall through to full-document mode if the pre-diff found nothing
         # (e.g. paragraph splitting failed) — never silently return empty.
 
