@@ -37,6 +37,33 @@ from google.cloud import documentai_v1 as documentai
 
 _PROCESSOR_ENV_VAR = "CURATOR_DOCAI_PROCESSOR_ID"
 
+# Doc AI's online (synchronous) ``process_document`` rejects any request
+# whose processed-page count exceeds 30 (``PAGE_LIMIT_EXCEEDED``). This is a
+# hard server-side limit — it cannot be raised via config. To ingest large
+# master directions (e.g. a 412-page Basel III circular) we split the PDF
+# into <=30-page parts with pypdf, process each part online, and stitch the
+# chunks back together with a page offset so page numbers stay absolute.
+_ONLINE_PAGE_LIMIT = 30
+
+# Overall ceiling on how many pages we will process for a single document —
+# a cost guard, not a hard API limit. Override with CURATOR_DOCAI_MAX_PAGES.
+# Default 500 covers every RBI master direction we have seen.
+def _max_doc_pages() -> int:
+    return int(os.environ.get("CURATOR_DOCAI_MAX_PAGES", "500"))
+
+
+# Trailing-overlap (in pages) added to each part when batching a large PDF.
+# A block (paragraph, table, list) that straddles a 30-page boundary would
+# be truncated by a hard split. To prevent that, each part *owns* a primary
+# page range but is parsed with this many extra trailing pages of context,
+# so any block whose start page is owned by the part is rendered whole. A
+# block is kept only by the part that owns its start page, giving a
+# deterministic de-dup that never relies on text matching. Raise this for
+# documents with very long page-spanning tables (cost: fewer owned pages per
+# part → more parts). Override with CURATOR_DOCAI_PAGE_OVERLAP.
+def _page_overlap() -> int:
+    return max(0, int(os.environ.get("CURATOR_DOCAI_PAGE_OVERLAP", "2")))
+
 
 class ChunkedSection(BaseModel):
     """One semantic chunk produced by Doc AI Layout Parser.
@@ -189,6 +216,98 @@ def _flatten_blocks(
             continue
 
 
+def _document_to_flat(document: Any, page_offset: int = 0) -> list[dict[str, Any]]:
+    """Convert a Doc AI ``Document`` into flat block dicts.
+
+    ``page_offset`` is added to every page number so that blocks parsed
+    from a split-out PDF part (whose own pages start at 1) carry their
+    absolute page number in the original document.
+    """
+    flat: list[dict[str, Any]] = []
+    layout = getattr(document, "document_layout", None)
+    if layout is not None and getattr(layout, "blocks", None):
+        _flatten_blocks(list(layout.blocks), flat)
+
+    # Fallback: if document_layout is empty (some processor versions
+    # only populate chunked_document), synthesise from chunks. Chunks
+    # have no layout_type, so we tag them as "paragraph" and leave
+    # heading detection to downstream graph_extractor.
+    if not flat:
+        chunked = getattr(document, "chunked_document", None)
+        if chunked is not None:
+            for ch in chunked.chunks or []:
+                ps_obj = getattr(ch, "page_span", None)
+                ps = _normalise_page(getattr(ps_obj, "page_start", 1) or 1)
+                pe = _normalise_page(getattr(ps_obj, "page_end", ps) or ps)
+                content = (getattr(ch, "content", "") or "").strip()
+                if not content:
+                    continue
+                flat.append(
+                    {
+                        "text": content,
+                        "layout_type": "paragraph",
+                        "page_start": ps,
+                        "page_end": pe,
+                        "raw": {"kind": "chunk", "chunk_id": ch.chunk_id},
+                    }
+                )
+
+    if page_offset:
+        for sec in flat:
+            sec["page_start"] += page_offset
+            sec["page_end"] += page_offset
+    return flat
+
+
+def _pdf_page_count(raw_bytes: bytes) -> int:
+    """Best-effort page count via pypdf. Returns 1 on any failure so the
+    caller falls back to a single online call (which will surface the real
+    Doc AI error if the document is genuinely oversized)."""
+    try:
+        import io
+
+        from pypdf import PdfReader
+
+        return len(PdfReader(io.BytesIO(raw_bytes)).pages)
+    except Exception:  # noqa: BLE001 — count is advisory only
+        return 1
+
+
+def _split_pdf_pages(raw_bytes: bytes, start: int, end: int) -> bytes:
+    """Return a new PDF containing 1-indexed pages [start, end] inclusive."""
+    import io
+
+    from pypdf import PdfReader, PdfWriter
+
+    reader = PdfReader(io.BytesIO(raw_bytes))
+    writer = PdfWriter()
+    for i in range(start - 1, min(end, len(reader.pages))):
+        writer.add_page(reader.pages[i])
+    buf = io.BytesIO()
+    writer.write(buf)
+    return buf.getvalue()
+
+
+def _process_bytes(client: Any, processor: str, raw_bytes: bytes) -> Any:
+    """One online Doc AI Layout-Parser call over ``raw_bytes``."""
+    request = documentai.ProcessRequest(
+        name=processor,
+        raw_document=documentai.RawDocument(
+            content=raw_bytes,
+            mime_type="application/pdf",
+        ),
+        process_options=documentai.ProcessOptions(
+            layout_config=documentai.ProcessOptions.LayoutConfig(
+                chunking_config=documentai.ProcessOptions.LayoutConfig.ChunkingConfig(
+                    chunk_size=1000,
+                    include_ancestor_headings=True,
+                ),
+            ),
+        ),
+    )
+    return client.process_document(request=request).document
+
+
 def _resolve_parent_headings(sections: list[dict[str, Any]]) -> None:
     """Walk forward, attaching the most-recent-heading's text to every
     subsequent non-heading chunk. In-place.
@@ -255,53 +374,47 @@ def parse_pdf(
     with pdf_path.open("rb") as fh:
         raw_bytes = fh.read()
 
-    request = documentai.ProcessRequest(
-        name=resolved_processor,
-        raw_document=documentai.RawDocument(
-            content=raw_bytes,
-            mime_type="application/pdf",
-        ),
-        process_options=documentai.ProcessOptions(
-            layout_config=documentai.ProcessOptions.LayoutConfig(
-                chunking_config=documentai.ProcessOptions.LayoutConfig.ChunkingConfig(
-                    chunk_size=1000,
-                    include_ancestor_headings=True,
-                ),
-            ),
-        ),
-    )
+    # Doc AI's online endpoint hard-caps at 30 processed pages. For larger
+    # documents, split into <=30-page parts, process each, and stitch with
+    # an absolute page offset. Documents within the limit take the original
+    # single-call path unchanged.
+    page_count = _pdf_page_count(raw_bytes)
+    max_pages = _max_doc_pages()
+    if page_count > max_pages:
+        import logging
 
-    result = client.process_document(request=request)
-    document = result.document
+        logging.getLogger(__name__).warning(
+            "docai.parse_pdf: %s has %d pages; capping at CURATOR_DOCAI_MAX_PAGES=%d.",
+            pdf_path.name,
+            page_count,
+            max_pages,
+        )
+        page_count = max_pages
 
     flat: list[dict[str, Any]] = []
-    layout = getattr(document, "document_layout", None)
-    if layout is not None and getattr(layout, "blocks", None):
-        _flatten_blocks(list(layout.blocks), flat)
-
-    # Fallback: if document_layout is empty (some processor versions
-    # only populate chunked_document), synthesise from chunks. Chunks
-    # have no layout_type, so we tag them as "paragraph" and leave
-    # heading detection to downstream graph_extractor.
-    if not flat:
-        chunked = getattr(document, "chunked_document", None)
-        if chunked is not None:
-            for ch in chunked.chunks or []:
-                ps_obj = getattr(ch, "page_span", None)
-                ps = _normalise_page(getattr(ps_obj, "page_start", 1) or 1)
-                pe = _normalise_page(getattr(ps_obj, "page_end", ps) or ps)
-                content = (getattr(ch, "content", "") or "").strip()
-                if not content:
-                    continue
-                flat.append(
-                    {
-                        "text": content,
-                        "layout_type": "paragraph",
-                        "page_start": ps,
-                        "page_end": pe,
-                        "raw": {"kind": "chunk", "chunk_id": ch.chunk_id},
-                    }
-                )
+    if page_count <= _ONLINE_PAGE_LIMIT:
+        document = _process_bytes(client, resolved_processor, raw_bytes)
+        flat = _document_to_flat(document)
+    else:
+        # Overlapping page batches so no block is truncated at a boundary.
+        # ``step`` = pages each part *owns*; the part is processed with
+        # ``overlap`` extra trailing pages of context (total <= 30). A block
+        # is kept only by the part whose owned range contains its start page,
+        # so the same block re-rendered as overlap in the next part is
+        # dropped there — deterministic de-dup, no text matching.
+        overlap = min(_page_overlap(), _ONLINE_PAGE_LIMIT - 1)
+        step = _ONLINE_PAGE_LIMIT - overlap
+        for primary_start in range(1, page_count + 1, step):
+            primary_end = min(primary_start + step - 1, page_count)
+            process_end = min(primary_end + overlap, page_count)
+            part_bytes = _split_pdf_pages(raw_bytes, primary_start, process_end)
+            document = _process_bytes(client, resolved_processor, part_bytes)
+            part_flat = _document_to_flat(document, page_offset=primary_start - 1)
+            flat.extend(
+                sec
+                for sec in part_flat
+                if primary_start <= sec["page_start"] <= primary_end
+            )
 
     _resolve_parent_headings(flat)
 
