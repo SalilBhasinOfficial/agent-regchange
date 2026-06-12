@@ -115,6 +115,47 @@ def _normalise_page(p: int) -> int:
     return max(1, int(p) if p else 1)
 
 
+def _cell_text(cell: Any) -> str:
+    """Flatten a Doc AI TableCell into a single line of text.
+
+    A cell holds nested layout blocks; we pull the text from each text_block
+    (recursing into children) and join with spaces. Numbers, percentages and
+    dates inside a cell are preserved verbatim — these are exactly the
+    risk-weight / CCF / LTV values the parameter-diff must see.
+    """
+    parts: list[str] = []
+
+    def _walk(blocks: list[Any]) -> None:
+        for blk in blocks or []:
+            tb = getattr(blk, "text_block", None)
+            if tb is not None:
+                t = (getattr(tb, "text", "") or "").strip()
+                if t:
+                    parts.append(t)
+                _walk(list(getattr(tb, "blocks", []) or []))
+
+    _walk(list(getattr(cell, "blocks", []) or []))
+    return " ".join(parts).strip()
+
+
+def _render_table(table_block: Any) -> str:
+    """Render a Doc AI table_block as pipe-delimited rows of real cell text.
+
+    Materialising the cell values (rather than emitting a "[table: NhxMb]"
+    placeholder) is what lets the diff catch numeric movements that live
+    inside tables — e.g. an equity risk weight moving 125% → 250%.
+    """
+    lines: list[str] = []
+    header_rows = list(getattr(table_block, "header_rows", []) or [])
+    body_rows = list(getattr(table_block, "body_rows", []) or [])
+    for row in header_rows + body_rows:
+        cells = list(getattr(row, "cells", []) or [])
+        rendered = [_cell_text(c) for c in cells]
+        if any(rendered):
+            lines.append(" | ".join(rendered))
+    return "\n".join(lines)
+
+
 def _flatten_blocks(
     blocks: list[Any],
     out: list[dict[str, Any]],
@@ -164,7 +205,13 @@ def _flatten_blocks(
             caption = (getattr(table_block, "caption", "") or "").strip()
             header_rows = list(getattr(table_block, "header_rows", []) or [])
             body_rows = list(getattr(table_block, "body_rows", []) or [])
-            text = caption or f"[table: {len(header_rows)}h x {len(body_rows)}b rows]"
+            rendered = _render_table(table_block)
+            # Prefer materialised cell text (carries the numeric values the
+            # diff needs); fall back to caption / shape placeholder if empty.
+            if rendered:
+                text = (caption + "\n" + rendered).strip() if caption else rendered
+            else:
+                text = caption or f"[table: {len(header_rows)}h x {len(body_rows)}b rows]"
             out.append(
                 {
                     "text": text,
@@ -402,19 +449,53 @@ def parse_pdf(
         # is kept only by the part whose owned range contains its start page,
         # so the same block re-rendered as overlap in the next part is
         # dropped there — deterministic de-dup, no text matching.
+        #
+        # Parts are independent, so we fan them out across a bounded thread
+        # pool (Doc AI calls are network-bound) and reassemble in page order.
+        # This turns ~15 sequential calls for a 412-page doc into a handful
+        # of concurrent batches. Bounded by CURATOR_DOCAI_CONCURRENCY to
+        # stay under Doc AI's per-minute page quota.
+        import logging
+        from concurrent.futures import ThreadPoolExecutor
+
+        log = logging.getLogger(__name__)
         overlap = min(_page_overlap(), _ONLINE_PAGE_LIMIT - 1)
         step = _ONLINE_PAGE_LIMIT - overlap
-        for primary_start in range(1, page_count + 1, step):
-            primary_end = min(primary_start + step - 1, page_count)
-            process_end = min(primary_end + overlap, page_count)
+        parts = [
+            (ps, min(ps + step - 1, page_count), min(ps + step - 1 + overlap, page_count))
+            for ps in range(1, page_count + 1, step)
+        ]
+        log.info(
+            "docai.parse_pdf: %s is %d pages; parsing in %d overlapping parts.",
+            pdf_path.name,
+            page_count,
+            len(parts),
+        )
+
+        def _parse_part(spec: tuple[int, int, int]) -> list[dict[str, Any]]:
+            primary_start, primary_end, process_end = spec
             part_bytes = _split_pdf_pages(raw_bytes, primary_start, process_end)
             document = _process_bytes(client, resolved_processor, part_bytes)
             part_flat = _document_to_flat(document, page_offset=primary_start - 1)
-            flat.extend(
+            kept = [
                 sec
                 for sec in part_flat
                 if primary_start <= sec["page_start"] <= primary_end
+            ]
+            log.info(
+                "docai.parse_pdf: %s part pages %d-%d done (%d blocks).",
+                pdf_path.name,
+                primary_start,
+                primary_end,
+                len(kept),
             )
+            return kept
+
+        concurrency = max(1, int(os.environ.get("CURATOR_DOCAI_CONCURRENCY", "4")))
+        with ThreadPoolExecutor(max_workers=min(concurrency, len(parts))) as ex:
+            # executor.map preserves input order → page order is correct.
+            for part_flat in ex.map(_parse_part, parts):
+                flat.extend(part_flat)
 
     _resolve_parent_headings(flat)
 

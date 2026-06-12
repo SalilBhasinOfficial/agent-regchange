@@ -238,6 +238,18 @@ def launch_chain_run(
             # amended clauses so an interactive/cached demo stays snappy;
             # "re-run live" (CURATOR_FAST_MODE unset) decomposes them all.
             _clauses_total = len(state.amended_clauses)
+            # Pre-diff clause filter: drop clauses byte-identical to the prior
+            # document before the per-clause four-lens fan-out (~4 LLM calls
+            # each). Exact-match only — any numeric change survives. Runs ahead
+            # of the fast-mode cap. Disable with CURATOR_PREDIFF_FILTER_CLAUSES=0.
+            if os.environ.get("CURATOR_PREDIFF_FILTER_CLAUSES", "1") != "0":
+                from app.ingest.prediff import filter_unchanged_clauses
+
+                _kept, _dropped = filter_unchanged_clauses(
+                    state.amended_clauses, state.comparison_text
+                )
+                if _dropped:
+                    state.amended_clauses = _kept
             _fast_clauses = os.environ.get("CURATOR_FAST_MODE", "0").strip().lower() in {
                 "1", "true", "yes", "on"
             }

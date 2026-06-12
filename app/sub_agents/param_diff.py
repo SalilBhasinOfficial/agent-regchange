@@ -134,7 +134,44 @@ def real_param_diff(
         for c in amended_clauses
         if (c.new_text or "").strip()
     )
-    new_blob = _truncate((clause_blob + "\n\n" + (new_text or "")).strip(), max_chars)
+    new_full = (clause_blob + "\n\n" + (new_text or "")).strip()
+
+    # Pre-diff gate: instead of dumping two full documents (which forces the
+    # model to hunt for changes and blows the output-token budget), do the
+    # paragraph alignment in plain Python first and feed the model only the
+    # aligned old→new deltas. Smaller input → no JSON truncation, lower cost,
+    # and the model sees pairs rather than haystacks. Disable with
+    # CURATOR_PREDIFF=0 to restore the full-document behavior.
+    if os.environ.get("CURATOR_PREDIFF", "1") != "0":
+        import logging
+
+        from app.ingest.prediff import prediff, split_paragraphs
+
+        result = prediff(
+            split_paragraphs(comparison_text),
+            split_paragraphs(new_full),
+        )
+        logging.getLogger(__name__).info("param_diff: %s", result.summary())
+        changed_blob = result.changed_blob(max_chars)
+        if changed_blob.strip():
+            prompt = (
+                f"NEW FRAMEWORK — {new_title}\n"
+                f"PRIOR FRAMEWORK — {comparison_title or 'consolidated / earlier framework'}\n"
+                f"=================================================\n"
+                f"The paragraphs below are ONLY the regions that changed between the\n"
+                f"prior and new framework, already aligned old→new (unchanged text has\n"
+                f"been removed in a deterministic pre-pass). Extract every quantitative\n"
+                f"parameter movement from these changes per your instructions.\n"
+                f"=================================================\n"
+                f"{changed_blob}\n\n"
+                f"Now produce the exhaustive ParameterChange table."
+            )
+            agent = build_agent()
+            return run_agent(agent, prompt, output_schema=list[ParameterChange])
+        # Fall through to full-document mode if the pre-diff found nothing
+        # (e.g. paragraph splitting failed) — never silently return empty.
+
+    new_blob = _truncate(new_full, max_chars)
     old_blob = _truncate(comparison_text, max_chars)
 
     prompt = (

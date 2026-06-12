@@ -127,6 +127,28 @@ def run_chain(
             comparison_title=state.comparison_title,
             comparison_text=state.comparison_text,
         )
+        # Pre-diff clause filter: the four-lens panel costs ~4 LLM calls per
+        # clause, so drop clauses byte-identical to the prior document before
+        # decomposing. Exact-match only — a clause that changed any number
+        # survives. Biggest win for same-document version diffs; near-no-op
+        # for cross-framework pairs. Disable with CURATOR_PREDIFF_FILTER_CLAUSES=0.
+        if _os.environ.get("CURATOR_PREDIFF_FILTER_CLAUSES", "1") != "0":
+            from app.ingest.prediff import filter_unchanged_clauses
+
+            kept, dropped = filter_unchanged_clauses(
+                state.amended_clauses, state.comparison_text
+            )
+            if dropped:
+                import logging
+
+                logging.getLogger(__name__).info(
+                    "chain: pre-diff dropped %d unchanged clause(s); %d to decompose "
+                    "(~%d fewer LLM calls).",
+                    dropped,
+                    len(kept),
+                    dropped * 4,
+                )
+                state.amended_clauses = kept
         state.obligations = real_decompose(state.amended_clauses)
         if fast_mode and len(state.obligations) > max_obls:
             state.obligations = state.obligations[:max_obls]
