@@ -762,6 +762,13 @@ def gallery(request: Request) -> HTMLResponse:
                     stats = _json.loads(row["stats_json"])
                 except Exception:  # noqa: BLE001
                     stats = {}
+            # Gallery shows real change-analyses only: a run must have a
+            # quantitative parameter diff (param_changes > 0). This excludes
+            # degenerate single-document triages (no comparison framework, no
+            # policy corpus) that otherwise render as "N obligations / N missing
+            # / N edits" — mathematically consistent but not a meaningful result.
+            if not (stats.get("param_changes") or 0) > 0:
+                continue
             ts = row.get("ts") or ""
             runs.append(
                 {

@@ -7,10 +7,22 @@
 <div class="stat-row">
   {% if state.param_changes %}<div class="stat"><span class="num">{{ state.param_changes | length }}</span><span class="lbl">Parameter changes</span></div>{% endif %}
   <div class="stat"><span class="num">{{ state.obligations | length }}</span><span class="lbl">Obligations</span></div>
+  {% if state.policies | length > 0 %}
   <div class="stat"><span class="num">{{ missing_count }}</span><span class="lbl">Missing coverage</span></div>
   <div class="stat"><span class="num">{{ state.diffs | length }}</span><span class="lbl">Suggested edits</span></div>
+  {% endif %}
   <div class="stat"><span class="num"><span class="pill {{ state.impact.priority }}">{{ state.impact.priority }}</span></span><span class="lbl">Priority</span></div>
 </div>
+
+{% if state.policies | length == 0 %}
+<div class="card amber">
+  <p><strong>Single-document triage.</strong> No internal policy corpus was loaded
+  for this run, so coverage mapping and suggested policy edits are not shown — every
+  obligation would trivially read as “uncovered”, which is not a real gap. Upload the
+  bank's policy set (or run a document-vs-document comparison) for full coverage
+  analysis and a quantitative parameter diff.</p>
+</div>
+{% endif %}
 
 <div class="card {{ state.impact.priority }}">
   <h3>Impact summary</h3>
