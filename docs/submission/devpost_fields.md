@@ -10,7 +10,9 @@ Every fortnight an RBI, SEBI, or IRDAI circular lands in a Chief Compliance Offi
 
 ## What it does
 
-Curator is an autonomous regulatory-intelligence agent for Indian BFSI. A Cloud Scheduler cron triggers a Discovery service every 30 minutes; it polls the SEBI RSS feed, dedupes against Spanner, and publishes new circulars to a Pub/Sub topic. The subscriber wakes the chain service, which (1) parses the PDF via Document AI Layout Parser, (2) ingests structure into Spanner Graph as nodes and edges, (3) runs a four-lens decompose panel — banker, compliance officer, auditor, customer-protection — in parallel, (4) a Reconciler merges and dedupes obligations and records per-lens dissent, (5) a Reflector inspects aggregate confidence and re-queries the Spanner Graph neighbourhood for low-confidence items, (6) a four-critic judge panel (impact, ICAAP, Pillar-3, ops-risk) scores severity, and (7) the result lands as a board-ready impact assessment in a Discovery Inbox UI. Every output is a proposal — a human approves before anything goes to the RMC. An optional A2A consumer interface exposes the same skills to an external regulatory corpus so other agents can consume Curator's findings.
+Curator is an autonomous regulatory-intelligence agent for Indian BFSI. A Cloud Scheduler cron triggers a Discovery service every 30 minutes; it polls the SEBI RSS feed, dedupes against Spanner, and publishes new circulars to a Pub/Sub topic. The Discovery Inbox is also seeded with the full RBI capital-adequacy regulatory trail — 24 circulars spanning Basel III master circulars, the New Capital Adequacy Framework, the prudential-norms Master Directions and the 2026 credit-risk Standardised Approach, each with its public rbi.org.in source. The subscriber wakes the chain service, which (1) parses the PDF via Document AI Layout Parser, (2) ingests structure into Spanner Graph as nodes and edges, (3) runs a **quantitative parameter-diff** that places the new framework side-by-side with the prior one and extracts every regulatory number that moved — risk weights by exposure class, LTV bands, credit-conversion factors, capital charges, effective dates — each as an old→new pair with its direction and Pillar-1 CRAR impact, (4) runs a four-lens decompose panel — banker, compliance officer, auditor, customer-protection — in parallel, (5) a Reconciler merges and dedupes obligations and records per-lens dissent, (6) a Reflector inspects aggregate confidence and re-queries the Spanner Graph neighbourhood for low-confidence items, (7) a four-critic judge panel (impact, ICAAP, Pillar-3, ops-risk) scores severity using the parameter movements, and (8) the result lands as a board-ready impact assessment in a Discovery Inbox UI. Every output is a proposal — a human approves before anything goes to the RMC. An optional A2A consumer interface exposes the same skills to an external regulatory corpus so other agents can consume Curator's findings.
+
+The headline demo diffs the **2026 Direction on Capital Charge for Credit Risk (Standardised Approach)** against the **prior Master Circular – Basel III Capital Regulations**: Curator surfaces the actual movements — e.g. credit-conversion factors on other commitments 50% → 40%, unconditionally-cancellable commitments 0% → 5% then 0% → 10% phased over 2027→2030, undrawn-limit CCFs 20% → 30% — each with the direction of the CRAR effect. This is the diff a Chief Compliance Officer actually needs, not a generic "you must implement the SA" obligation.
 
 ## How we built it
 
@@ -35,7 +37,8 @@ Three tracks. (1) **Marketplace** — publish via `agents-cli publish gemini-ent
 ## Built With
 
 - Google ADK 1.34 (`ParallelAgent`, `SequentialAgent`, `LoopAgent`, `Runner`)
-- Gemini-flash via Vertex AI (`global` endpoint)
+- Quantitative parameter-diff stage (old→new risk-weight / CCF / capital-charge extraction with CRAR impact)
+- Gemini 2.5 Flash-Lite via Vertex AI (`global` endpoint)
 - Spanner Graph (`asia-south1`, Mumbai)
 - Document AI Layout Parser (US processor)
 - Cloud Run × 2 (chain + discovery)

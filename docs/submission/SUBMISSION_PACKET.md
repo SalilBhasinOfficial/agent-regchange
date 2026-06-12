@@ -52,11 +52,17 @@ How it works:
 • A four-stakeholder-lens debate panel (banker / compliance / auditor /
   customer-protection) decomposes obligations in parallel via ADK ParallelAgent.
 • A Reconciler merges and a Reflector re-queries Spanner Graph on low confidence.
+• A quantitative parameter-diff places the new framework against the prior one
+  and extracts every regulatory number that moved (risk weights, CCFs, capital
+  charges, effective dates) as old→new pairs with their CRAR impact.
 • A four-critic judge panel scores impact (ICAAP / Pillar-3 / ops-risk).
 • Output: a board-ready impact assessment in a Discovery Inbox UI.
 
-On the demo amendment the debate panel surfaces 3.7× more obligations and 9×
-more missing-coverage gaps than a single-shot agent.
+The headline demo diffs the 2026 Credit-Risk Standardised Approach Direction
+against the prior Master Circular – Basel III Capital Regulations, surfacing the
+real movements (CCF on other commitments 50%→40%, unconditionally-cancellable
+commitments 0%→5%→10% phased 2027→2030, undrawn limits 20%→30%). The Discovery
+Inbox also tracks the full RBI capital-adequacy circular trail (24 circulars).
 
 Built with: Google ADK 1.34, Gemini 2.5 Flash-Lite (Vertex AI), Spanner Graph
 (asia-south1), Document AI, Cloud Run × 2, A2A protocol, Cloud Scheduler +
@@ -107,6 +113,10 @@ in minutes. Proposals only; human approves.
 
 ### Accomplishments we're proud of
 *(paste "Accomplishments" from devpost_fields.md, correcting:)*
+- **Quantitative parameter-diff**: on the credit-risk SA vs Basel III demo it
+  extracts ~340 old→new regulatory-parameter movements (risk weights, CCFs,
+  capital charges) with direction + effective date + CRAR impact — the analysis
+  a compliance officer actually needs, not a generic obligation list.
 - Test suite now **24 passed / 13 skipped / 0 failed**.
 - Per-call **USD cost tracking** writes to `agent_runs.cost_usd_estimated`; a
   live `/cost` endpoint rolls up spend by agent.
@@ -131,14 +141,14 @@ Cloud Trace, Python 3.12, uv, FastAPI, Jinja2, Apache 2.0
 ## 🔗 Canonical links (copy block)
 
 ```
-Repo:        https://github.com/SalilBhasinOfficial/agent-regchange
+Demo video:  https://youtu.be/I8WLLmgtQJ4   (unlisted)
+Repo:        https://github.com/SalilBhasinOfficial/agent-regchange   (public)
 Live chain:  https://curator-chain-890675948352.asia-south1.run.app
 Inbox:       https://curator-chain-890675948352.asia-south1.run.app/inbox
 A2A card:    https://curator-chain-890675948352.asia-south1.run.app/a2a/app/.well-known/agent-card.json
 Cost:        https://curator-chain-890675948352.asia-south1.run.app/cost
-Discovery:   https://curator-discovery-890675948352.asia-south1.run.app
 Architecture image: docs/submission/architecture.png
-Demo video:  docs/submission/curator_demo.mp4  (upload to YouTube first)
+Local MP4:   docs/submission/curator_demo.mp4
 ```
 
 ---
