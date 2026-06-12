@@ -78,6 +78,38 @@ Rules:
 """
 
 
+def _clean_param_changes(rows: list[ParameterChange]) -> list[ParameterChange]:
+    """Drop non-changes and duplicates the model emits despite instructions.
+
+    The model frequently returns ``direction='unchanged'`` rows (e.g. CET1
+    5.5%→5.5%) and repeats the same parameter across batches. These are not
+    changes and inflate the count (observed: 470 rows, 241 of them
+    'unchanged'). Remove them deterministically.
+    """
+    seen: set[tuple] = set()
+    cleaned: list[ParameterChange] = []
+    for r in rows:
+        direction = (r.direction or "").strip().lower()
+        old_v = (r.old_value or "").strip()
+        new_v = (r.new_value or "").strip()
+        # Not a movement: explicitly unchanged, or old == new with no signal.
+        if direction == "unchanged":
+            continue
+        if old_v and new_v and old_v == new_v and direction not in {"new", "removed"}:
+            continue
+        key = (
+            (r.parameter or "").strip().lower(),
+            (r.exposure_class or "").strip().lower(),
+            old_v,
+            new_v,
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(r)
+    return cleaned
+
+
 def stub_param_diff(
     amended_clauses: list[AmendedClause],
     *,
@@ -183,9 +215,14 @@ def real_param_diff(
                     all_changes.extend(rows)
                 except Exception as exc:  # noqa: BLE001 — one bad batch ≠ lost run
                     log.warning("param_diff batch %d/%d failed: %s", bi + 1, n_batches, exc)
-            log.info("param_diff: %d parameter changes across %d batch(es).",
-                     len(all_changes), n_batches)
-            return all_changes
+            cleaned = _clean_param_changes(all_changes)
+            log.info(
+                "param_diff: %d raw → %d real parameter changes across %d batch(es).",
+                len(all_changes),
+                len(cleaned),
+                n_batches,
+            )
+            return cleaned
         # Fall through to full-document mode if the pre-diff found nothing
         # (e.g. paragraph splitting failed) — never silently return empty.
 
@@ -203,7 +240,9 @@ def real_param_diff(
     )
 
     agent = build_agent()
-    return run_agent(agent, prompt, output_schema=list[ParameterChange])
+    return _clean_param_changes(
+        run_agent(agent, prompt, output_schema=list[ParameterChange])
+    )
 
 
 def build_agent():  # type: ignore[no-untyped-def]

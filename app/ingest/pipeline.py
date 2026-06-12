@@ -86,15 +86,56 @@ def _raw_text_from_chunks(chunks: list[ChunkedSection]) -> str:
     return "\n\n".join(c.text for c in chunks if c.text)
 
 
+# Headings that are document structure, not the document's name. Title
+# extraction must skip these (a TOC heading rendered first would otherwise
+# become the title — observed as the literal title "Table of Contents").
+_NON_TITLE_HEADINGS = frozenset(
+    {
+        "table of contents",
+        "contents",
+        "index",
+        "annex",
+        "annexure",
+        "appendix",
+        "preamble",
+        "notification",
+    }
+)
+
+
+def _looks_like_title(text: str) -> bool:
+    t = text.strip()
+    if len(t) < 6:
+        return False
+    low = t.lower().strip(" .:-")
+    if low in _NON_TITLE_HEADINGS:
+        return False
+    # A materialised table (pipe-delimited rows) or a TOC dump is not a title.
+    if "|" in t or t.count("\n") > 1:
+        return False
+    return True
+
+
 def _title_from_chunks(chunks: list[ChunkedSection], fallback: str) -> str:
-    """Pick the first heading-typed chunk's text as the document title."""
+    """Pick the first real heading as the document title.
+
+    Skips structural headings (table of contents, index, annex…) and
+    materialised tables so the title is the document's actual name, not the
+    first piece of front-matter.
+    """
     for ch in chunks:
-        if ch.layout_type in {"title", "subtitle", "heading-1"} and ch.text.strip():
+        if (
+            ch.layout_type in {"title", "subtitle", "heading-1", "heading-2"}
+            and _looks_like_title(ch.text)
+        ):
             return ch.text.strip()
-    # Fallback: first non-empty chunk.
+    # Fallback: first non-empty, title-like line.
     for ch in chunks:
-        if ch.text.strip():
-            return ch.text.strip().splitlines()[0][:200]
+        if ch.layout_type == "table":
+            continue
+        line = ch.text.strip().splitlines()[0] if ch.text.strip() else ""
+        if _looks_like_title(line):
+            return line[:200]
     return fallback
 
 

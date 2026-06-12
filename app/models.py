@@ -231,6 +231,46 @@ class ImpactSummary(BaseModel):
     )
 
 
+class AuditFinding(BaseModel):
+    """One issue raised by the compliance / internal-audit review."""
+
+    severity: Literal["info", "minor", "major", "blocker"]
+    category: Literal[
+        "data_quality",
+        "accuracy",
+        "completeness",
+        "consistency",
+        "compliance",
+        "other",
+    ]
+    item: str = Field(description="What the finding is about (parameter, obligation, field).")
+    detail: str = Field(description="Why it's a problem and what to check.")
+
+
+class AuditReport(BaseModel):
+    """Verdict of the compliance + internal-audit review of the final package.
+
+    This is the automated control before a human signs off — proposals only,
+    human approves. It does NOT rewrite the analysis; it judges whether the
+    analysis is fit to publish and flags what a reviewer must check.
+    """
+
+    verdict: Literal["pass", "review", "fail"] = Field(
+        description="pass = publishable; review = publish with caveats; fail = do not publish.",
+    )
+    publishable: bool = Field(
+        description="True only when the package is safe to present without a human first resolving blockers.",
+    )
+    compliance_summary: str = Field(
+        description="Compliance officer's one-paragraph verdict.",
+    )
+    audit_summary: str = Field(
+        description="Internal auditor's one-paragraph verdict on data quality / evidence.",
+    )
+    findings: list[AuditFinding] = Field(default_factory=list)
+    confidence: float = Field(default=0.7, ge=0.0, le=1.0)
+
+
 # ----- the shared state ----------------------------------------------------
 
 
@@ -255,6 +295,9 @@ class AgentState(BaseModel):
     matches: list[PolicyMatch] = Field(default_factory=list)
     diffs: list[PolicyDiff] = Field(default_factory=list)
     impact: ImpactSummary | None = None
+    # Compliance + internal-audit review of the assembled package — the
+    # automated control gate before a human approves / publishes.
+    audit: "AuditReport | None" = None
     qna_history: list[QnATurn] = Field(default_factory=list)
     confidence_log: dict[str, float] = Field(
         default_factory=dict,

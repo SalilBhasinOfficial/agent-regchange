@@ -314,7 +314,29 @@ def launch_chain_run(
                 state.impact = real_judge(
                     state.obligations, state.matches, state.diffs, state.param_changes
                 )
+                # Compliance + internal-audit control gate before publishing.
+                try:
+                    from app.sub_agents.audit import real_audit
+
+                    with _RUNS_LOCK:
+                        _RUNS[pipeline_run_id]["status"] = "auditing"
+                    try:
+                        from app.observability import progress as _prog
+
+                        _prog.set_stage("Compliance + internal-audit review", total=1, unit="review")
+                    except Exception:  # noqa: BLE001
+                        pass
+                    state.audit = real_audit(state)
+                    try:
+                        _prog.bump()
+                    except Exception:  # noqa: BLE001
+                        pass
+                except Exception:  # noqa: BLE001 — audit is a gate, never fail the run
+                    import logging as _logging
+
+                    _logging.getLogger(__name__).warning("audit stage failed; continuing")
             else:
+                from app.sub_agents.audit import stub_audit
                 from app.sub_agents.decompose import stub_decompose
                 from app.sub_agents.diff import stub_diff
                 from app.sub_agents.judge import stub_judge
@@ -324,6 +346,7 @@ def launch_chain_run(
                 state.matches = stub_map(state.obligations, state.policies)
                 state.diffs = stub_diff(state.matches, state.obligations, state.policies)
                 state.impact = stub_judge(state.obligations, state.matches, state.diffs)
+                state.audit = stub_audit(state)
 
             _t_done = _time.monotonic()
             with _RUNS_LOCK:
@@ -341,6 +364,8 @@ def launch_chain_run(
                 "param_changes": len(state.param_changes),
                 "matches": len(state.matches),
                 "diffs": len(state.diffs),
+                "audit_verdict": state.audit.verdict if state.audit else None,
+                "audit_findings": len(state.audit.findings) if state.audit else 0,
                 "ingest_seconds": round((_t_ingest - _t0), 1) if _t_ingest else None,
                 "chain_seconds": round((_t_done - _t_ingest), 1) if _t_ingest else None,
                 "total_seconds": round((_t_done - _t0), 1),

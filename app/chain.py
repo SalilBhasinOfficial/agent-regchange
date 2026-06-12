@@ -157,6 +157,15 @@ def run_chain(
         state.impact = real_judge(
             state.obligations, state.matches, state.diffs, state.param_changes
         )
+        # Compliance + internal-audit control gate over the assembled package.
+        from app.sub_agents.audit import real_audit
+
+        try:
+            state.audit = real_audit(state)
+        except Exception:  # noqa: BLE001 — audit is a gate, never fail the run
+            import logging
+
+            logging.getLogger(__name__).warning("audit stage failed; continuing")
         for q in questions:
             state.qna_history.append(real_qna(state, q))
     else:
@@ -164,6 +173,9 @@ def run_chain(
         state.matches = stub_map(state.obligations, state.policies)
         state.diffs = stub_diff(state.matches, state.obligations, state.policies)
         state.impact = stub_judge(state.obligations, state.matches, state.diffs)
+        from app.sub_agents.audit import stub_audit
+
+        state.audit = stub_audit(state)
         for q in questions:
             state.qna_history.append(stub_qna(state, q))
 

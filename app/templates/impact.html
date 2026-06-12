@@ -14,6 +14,32 @@
   <div class="stat"><span class="num"><span class="pill {{ state.impact.priority }}">{{ state.impact.priority }}</span></span><span class="lbl">Priority</span></div>
 </div>
 
+{% if state.audit %}
+<div class="card {% if state.audit.verdict == 'pass' %}full{% elif state.audit.verdict == 'fail' %}high{% else %}amber{% endif %}">
+  <h3>
+    Compliance &amp; internal-audit review —
+    {% if state.audit.verdict == 'pass' %}✓ Passed{% elif state.audit.verdict == 'fail' %}✗ Not publishable{% else %}⚠ Review required{% endif %}
+  </h3>
+  <p><strong>Compliance:</strong> {{ state.audit.compliance_summary }}</p>
+  <p><strong>Internal audit:</strong> {{ state.audit.audit_summary }}</p>
+  {% if state.audit.findings %}
+  <table class="table">
+    <thead><tr><th>Severity</th><th>Item</th><th>What to check</th></tr></thead>
+    <tbody>
+      {% for f in state.audit.findings %}
+      <tr>
+        <td><span class="pill {% if f.severity == 'blocker' %}high{% elif f.severity == 'major' %}missing{% elif f.severity == 'minor' %}partial{% else %}full{% endif %}">{{ f.severity }}</span></td>
+        <td>{{ f.item }}</td>
+        <td>{{ f.detail }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+  <p class="muted">Automated control gate — a human still approves before anything reaches the Risk Management Committee.</p>
+</div>
+{% endif %}
+
 {% if state.policies | length == 0 %}
 <div class="card amber">
   <p><strong>Single-document triage.</strong> No internal policy corpus was loaded
