@@ -52,6 +52,49 @@ resource "google_cloud_run_v2_service" "app" {
         name  = "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"
         value = "NO_CONTENT"
       }
+
+      # ---- Curator runtime flags ----
+      # Without these a `terraform apply` reverts the service to STUB mode:
+      # canned placeholder obligations, no cost logging, mock grounding. They
+      # must be codified here so the deployed service is "real" after any apply.
+      env {
+        name  = "CURATOR_REAL_LLM"
+        value = "1"
+      }
+      env {
+        name  = "CURATOR_GROUNDING"
+        value = "spanner"
+      }
+      env {
+        name  = "CURATOR_AGENT_RUN_LOG"
+        value = "1"
+      }
+      env {
+        name  = "CURATOR_GEMINI_MODEL"
+        value = "gemini-2.5-flash-lite"
+      }
+      env {
+        name  = "GOOGLE_GENAI_USE_VERTEXAI"
+        value = "True"
+      }
+      env {
+        name  = "GOOGLE_CLOUD_PROJECT"
+        value = var.project_id
+      }
+      env {
+        # Gemini flash-lite is served via the global endpoint (see DECISIONS-9);
+        # data residency is governed by Spanner's asia-south1 region, not this.
+        name  = "GOOGLE_CLOUD_LOCATION"
+        value = "global"
+      }
+      env {
+        name  = "SPANNER_INSTANCE"
+        value = "curator-graph"
+      }
+      env {
+        name  = "SPANNER_DATABASE"
+        value = "curator"
+      }
     }
 
     service_account = google_service_account.app_sa.email

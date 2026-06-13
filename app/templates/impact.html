@@ -11,15 +11,16 @@
   <div class="stat"><span class="num">{{ missing_count }}</span><span class="lbl">Missing coverage</span></div>
   <div class="stat"><span class="num">{{ state.diffs | length }}</span><span class="lbl">Suggested edits</span></div>
   {% endif %}
-  <div class="stat"><span class="num"><span class="pill {{ state.impact.priority }}">{{ state.impact.priority }}</span></span><span class="lbl">Priority</span></div>
+  {% if state.impact %}<div class="stat"><span class="num"><span class="pill {{ state.impact.priority }}">{{ state.impact.priority }}</span></span><span class="lbl">Priority</span></div>{% endif %}
 </div>
 
 {% if state.audit %}
 <div class="card {% if state.audit.verdict == 'pass' %}full{% elif state.audit.verdict == 'fail' %}high{% else %}amber{% endif %}">
   <h3>
     Compliance &amp; internal-audit review —
-    {% if state.audit.verdict == 'pass' %}✓ Passed{% elif state.audit.verdict == 'fail' %}✗ Not publishable{% else %}⚠ Review required{% endif %}
+    {% if state.audit.verdict == 'pass' %}✓ Cleared for reviewer sign-off{% elif state.audit.verdict == 'fail' %}✗ Blocked — data-quality issues to resolve{% else %}Reviewer notes — publishable with caveats{% endif %}
   </h3>
+  <p class="muted">This is Curator's automated two-person control gate (compliance officer + internal auditor) — its job is to surface caveats <em>before</em> a human signs off, not a verdict on the pipeline. Curator always proposes; a human approves.</p>
   <p><strong>Compliance:</strong> {{ state.audit.compliance_summary }}</p>
   <p><strong>Internal audit:</strong> {{ state.audit.audit_summary }}</p>
   {% if state.audit.findings %}
@@ -36,7 +37,6 @@
     </tbody>
   </table>
   {% endif %}
-  <p class="muted">Automated control gate — a human still approves before anything reaches the Risk Management Committee.</p>
 </div>
 {% endif %}
 
@@ -66,6 +66,7 @@
 </div>
 {% endif %}
 
+{% if state.impact %}
 <div class="card {{ state.impact.priority }}">
   <h3>Impact summary</h3>
   <p>{{ state.impact.summary }}</p>
@@ -81,6 +82,9 @@
   </div>
   <p class="mono-small muted">Confidence: {{ '%.2f' % state.impact.confidence }} · Impact score: {{ '%.2f' % state.impact.impact_score }}</p>
 </div>
+{% else %}
+<div class="card amber"><p><strong>Impact assessment unavailable for this run.</strong> The analysis completed but the impact-summary stage did not return a result — the obligations and any parameter changes below still stand.</p></div>
+{% endif %}
 
 {% if state.param_changes %}
 {% set proven_moves = state.param_changes | rejectattr('direction', 'equalto', 'new') | list %}

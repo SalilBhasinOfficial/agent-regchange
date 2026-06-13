@@ -251,7 +251,12 @@ def launch_chain_run(
                 _kept, _dropped = filter_unchanged_clauses(
                     state.amended_clauses, state.comparison_text
                 )
-                if _dropped:
+                # Guard: never let the filter empty the clause set — a doc that
+                # is byte-identical to its prior (re-issue) or whose only clause
+                # matches the prior would otherwise cascade to a "0 of
+                # everything" page. Keep at least the original clauses if the
+                # filter would drop them all.
+                if _dropped and _kept:
                     state.amended_clauses = _kept
             _fast_clauses = os.environ.get("CURATOR_FAST_MODE", "0").strip().lower() in {
                 "1", "true", "yes", "on"
@@ -380,6 +385,20 @@ def launch_chain_run(
                 "total_seconds": round((_t_done - _t0), 1),
                 "model": curator_model_name(),
             }
+            # Roll up the per-call cost (logged to agent_runs when
+            # CURATOR_AGENT_RUN_LOG=1) into a single figure so the Gallery and
+            # persisted views can show spend. Best-effort: $0/None if logging
+            # is off or Spanner is unavailable.
+            _total_cost = None
+            try:
+                from app.observability.pipeline_store import stage_breakdown as _sb
+
+                _bd = _sb(pipeline_run_id)
+                if _bd.get("available"):
+                    _total_cost = _bd.get("totals", {}).get("cost_usd")
+            except Exception:  # noqa: BLE001
+                _total_cost = None
+            stats["total_cost_usd"] = _total_cost
             with _RUNS_LOCK:
                 _RUNS[pipeline_run_id]["stats"] = stats
             # Persist to Spanner so /impact/<id> survives container
@@ -405,6 +424,7 @@ def launch_chain_run(
                     clauses_count=_RUNS[pipeline_run_id]["clauses_count"],
                     state_json=_persist.model_dump_json(),
                     stats_json=_json.dumps(stats),
+                    total_cost_usd=_total_cost,
                 )
             except Exception:  # noqa: BLE001
                 pass
@@ -487,8 +507,25 @@ def analyse_status(request: Request, run_id: str) -> HTMLResponse:
             _prog.clear(run_id)
         except Exception:  # noqa: BLE001
             pass
-        err = entry.get("error", "unknown error")
-        return HTMLResponse(content=f'<p class="muted">Error: {err}</p>')
+        # Keep the raw traceback in logs (stored on the entry); show the user a
+        # friendly, non-leaky message. Most failures here are transient model
+        # rate-limits after the retry budget is exhausted.
+        err = str(entry.get("error", "")) or ""
+        if any(s in err for s in ("429", "RESOURCE_EXHAUSTED", "quota", "Quota", "deadline", "Timeout")):
+            msg = (
+                "Analysis paused — the model hit a temporary rate/quota limit after "
+                "retrying. Please try again shortly, or open one of the cached demos."
+            )
+        else:
+            msg = (
+                "Analysis could not complete for this document. Please try again, or "
+                "open one of the cached demos from the gallery."
+            )
+        return HTMLResponse(
+            content=f'<p class="muted">{msg}</p>'
+            '<p class="footer-actions"><a class="btn secondary" href="/">Try another</a> '
+            '<a class="btn secondary" href="/gallery">View gallery</a></p>'
+        )
 
     import time as _time
 
@@ -796,12 +833,16 @@ def gallery(request: Request) -> HTMLResponse:
                     stats = _json.loads(row["stats_json"])
                 except Exception:  # noqa: BLE001
                     stats = {}
-            # Gallery shows real change-analyses only: a run must have a
-            # quantitative parameter diff (param_changes > 0). This excludes
-            # degenerate single-document triages (no comparison framework, no
-            # policy corpus) that otherwise render as "N obligations / N missing
-            # / N edits" — mathematically consistent but not a meaningful result.
-            if not (stats.get("param_changes") or 0) > 0:
+            # Gallery shows any run that produced a meaningful result — a
+            # quantitative parameter diff OR extracted obligations. The earlier
+            # param_changes>0-only filter hid every successful single-document
+            # triage and Inbox-discovered analysis (which never have a
+            # comparison framework), making the gallery look empty right after a
+            # user completed a run. Only truly empty runs (0 params AND 0
+            # obligations) are skipped.
+            _has_params = (stats.get("param_changes") or 0) > 0
+            _has_obls = (stats.get("obligations") or 0) > 0
+            if not (_has_params or _has_obls):
                 continue
             ts = row.get("ts") or ""
             runs.append(
