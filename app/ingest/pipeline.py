@@ -141,7 +141,13 @@ _TITLE_KEYWORDS = (
 
 def _looks_like_title(text: str) -> bool:
     t = text.strip()
-    if len(t) < 10:
+    # A real document title is a short noun phrase, not a sentence/paragraph.
+    # Reject overly long strings so a body paragraph that happens to contain a
+    # keyword ("...the Basel III framework...") can't be picked as the title.
+    if len(t) < 10 or len(t) > 160:
+        return False
+    # A title is not a full sentence — reject if it ends like prose.
+    if t.rstrip().endswith((".", ";")) and len(t) > 80:
         return False
     low = t.lower().strip(" .:-")
     if low in _NON_TITLE_HEADINGS:
