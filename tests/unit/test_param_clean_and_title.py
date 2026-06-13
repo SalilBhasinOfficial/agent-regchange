@@ -28,13 +28,30 @@ def test_clean_drops_equal_old_new_even_if_not_labelled_unchanged():
     assert _clean_param_changes(rows) == []
 
 
-def test_clean_keeps_new_and_removed_with_equal_or_null_values():
+def test_clean_keeps_introduced_rows_when_nothing_is_proven():
+    # No increase/decrease/restructured and no prior-value rows → the run would
+    # otherwise be empty, so the introduced "new" rows are kept (capad case).
     rows = [
-        _pc("New buffer", None, "2.5%", "new"),
-        _pc("Old levy", "1%", "0%", "removed"),
+        _pc("Add-on factor A", None, "0.25", "new"),
+        _pc("Add-on factor B", None, "0.50", "new"),
     ]
     out = _clean_param_changes(rows)
     assert len(out) == 2
+
+
+def test_clean_drops_null_old_new_when_a_proven_move_exists():
+    # creditrisk case: a genuine movement is present, so the null-old "new"
+    # restatement noise is suppressed and only verified diffs remain.
+    rows = [
+        _pc("Risk weight — Central Govt", None, "0%", "new"),  # restatement noise
+        _pc("Equity RW", "125%", "250%", "increase"),  # proven movement
+        _pc("Old levy", "1%", "0%", "removed"),  # cites a prior value → kept
+    ]
+    out = _clean_param_changes(rows)
+    params = {r.parameter for r in out}
+    assert "Equity RW" in params
+    assert "Old levy" in params
+    assert "Risk weight — Central Govt" not in params
 
 
 def test_clean_dedupes():

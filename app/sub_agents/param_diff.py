@@ -78,13 +78,31 @@ Rules:
 """
 
 
-def _clean_param_changes(rows: list[ParameterChange]) -> list[ParameterChange]:
-    """Drop non-changes and duplicates the model emits despite instructions.
+# Directions that represent a *verified* old→new movement: both sides are
+# anchored in the text (a number moved, or a flat value became a band/formula).
+_PROVEN_DIRECTIONS = frozenset({"increase", "decrease", "restructured"})
 
-    The model frequently returns ``direction='unchanged'`` rows (e.g. CET1
-    5.5%→5.5%) and repeats the same parameter across batches. These are not
-    changes and inflate the count (observed: 470 rows, 241 of them
-    'unchanged'). Remove them deterministically.
+
+def _clean_param_changes(rows: list[ParameterChange]) -> list[ParameterChange]:
+    """Drop non-changes/duplicates, then prefer *proven* movements.
+
+    Two passes:
+
+    1. Deterministic hygiene — drop ``direction='unchanged'`` rows (e.g. CET1
+       5.5%→5.5%), ``removed`` rows with no original value, mislabelled
+       old==new rows, and cross-batch duplicates (observed: 470 raw rows, 241
+       'unchanged').
+    2. *Proven-movement* gate — a ``new`` row carries a null ``old_value`` by
+       definition, so it is a parameter *stated* in the new framework, not a
+       *verified* old→new diff. When the diff aligned a restatement into an
+       "added" block (common: a credit-risk SA Direction repeats Basel weights
+       in different wording) the model emits it as ``new`` with no prior value.
+       These dominate the count and the audit correctly blocks on them. So
+       when the extraction contains any genuine movement (increase / decrease /
+       restructured), drop the null-old ``new`` noise and surface only the
+       verified diffs. If *nothing* is proven (e.g. a short amendment that only
+       introduces a brand-new table), keep the introduced rows so the run is
+       not left empty — those are then honestly framed as "newly introduced".
     """
     seen: set[tuple] = set()
     cleaned: list[ParameterChange] = []
@@ -111,7 +129,16 @@ def _clean_param_changes(rows: list[ParameterChange]) -> list[ParameterChange]:
             continue
         seen.add(key)
         cleaned.append(r)
-    return cleaned
+
+    proven = [
+        r
+        for r in cleaned
+        if (r.direction or "").strip().lower() in _PROVEN_DIRECTIONS
+        or (r.old_value or "").strip()  # any row that cites a prior value
+    ]
+    # Prefer verified movements; fall back to the full set only when there is
+    # nothing proven to show (so a brand-new-table amendment isn't blanked out).
+    return proven if proven else cleaned
 
 
 def stub_param_diff(

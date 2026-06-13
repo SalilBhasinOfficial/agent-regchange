@@ -83,9 +83,14 @@
 </div>
 
 {% if state.param_changes %}
+{% set proven_moves = state.param_changes | rejectattr('direction', 'equalto', 'new') | list %}
 <h3>Quantitative changes — {{ state.amendment.title }} vs {{ state.comparison_title or 'prior framework' }}</h3>
 <div class="card">
+  {% if proven_moves %}
   <p class="hint">Old → new movement of each regulatory parameter, with effect on RWA / CRAR. The diff a compliance officer actually needs — proposals for review, not advice.</p>
+  {% else %}
+  <p class="hint">Parameters <strong>newly introduced</strong> by this amendment — the prior framework states no corresponding value, so each is an addition rather than an old→new movement. Proposals for review, not advice.</p>
+  {% endif %}
   <div class="table-wrap">
     <table>
       <thead>
