@@ -69,6 +69,19 @@ def test_title_skips_materialised_table():
     assert _title_from_chunks(chunks, "fb") == "Reserve Bank of India Directions, 2026"
 
 
+def test_title_skips_parenthesised_clause_sentence():
+    # "(2) These instructions shall come into effect from April 01, 2027."
+    # was wrongly picked as the creditrisk demo title — a parenthesised
+    # sub-clause sentence, not the document name.
+    chunks = [
+        _chunk("(2) These instructions shall come into effect from April 01, 2027."),
+        _chunk("Master Circular – Basel III Capital Regulations"),
+    ]
+    assert _title_from_chunks(chunks, "fb") == (
+        "Master Circular – Basel III Capital Regulations"
+    )
+
+
 def test_title_falls_back_when_no_real_heading():
     chunks = [_chunk("Index", layout="heading-1")]
     assert _title_from_chunks(chunks, "the-fallback") == "the-fallback"

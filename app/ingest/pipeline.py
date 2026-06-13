@@ -118,7 +118,7 @@ import re as _re
 
 _STRUCTURAL_PREFIX = _re.compile(
     r"^\s*("
-    r"\d+(\.\d+)*[\.\)]?\s|"  # 1.  2.3)  etc.
+    r"\(?\d+(\.\d+)*[\.\)]\s|"  # 1.  2.3)  (2)  etc. — parenthesised too
     r"(chapter|section|part|clause|article|para(graph)?|schedule|annex(ure)?)\b"
     r")",
     _re.IGNORECASE,
@@ -146,8 +146,10 @@ def _looks_like_title(text: str) -> bool:
     # keyword ("...the Basel III framework...") can't be picked as the title.
     if len(t) < 10 or len(t) > 160:
         return False
-    # A title is not a full sentence — reject if it ends like prose.
-    if t.rstrip().endswith((".", ";")) and len(t) > 80:
+    # A title is not a full sentence — document names never end in sentence
+    # punctuation ("(2) These instructions shall come into effect from April
+    # 01, 2027." was wrongly picked because the old length>80 guard missed it).
+    if t.rstrip().endswith((".", ";")):
         return False
     low = t.lower().strip(" .:-")
     if low in _NON_TITLE_HEADINGS:
