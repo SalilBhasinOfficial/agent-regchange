@@ -24,19 +24,28 @@ from app.sub_agents.lenses import LENS_NAMES
 
 
 def _normalize_action(action: str) -> str:
-    """Coarse fingerprint of an action string for dedup purposes.
+    """Fingerprint of an action string for dedup purposes.
 
-    Lowercases, strips punctuation, collapses whitespace, drops the
-    shortest filler words. Two near-paraphrases of the same obligation
-    should collide; genuinely different actions should not. We're
-    deliberately permissive — over-merging is the safer error here than
-    surfacing two cosmetically-different versions of the same obligation.
+    Lowercases, strips punctuation, collapses whitespace, and drops only short
+    filler WORDS — but KEEPS word order and KEEPS numeric tokens. The previous
+    version sorted tokens alphabetically and kept only the first 8, which
+    collapsed genuinely-distinct obligations that merely shared vocabulary
+    (e.g. "obtain consent before sharing data" vs "obtain consent before
+    cross-selling", or "report breach within 6 hours" vs "within 24 hours" —
+    the differing number/object fell outside the sorted-8 window). Across the
+    broad document array, under-merging (two near-duplicates) is far safer than
+    silently dropping a real obligation. Near-paraphrases of the SAME duty from
+    different lenses still collide because they share the same content words in
+    the same order within the same source clause (the dedup key also includes
+    source_clause_id).
     """
     text = action.lower()
     text = re.sub(r"[^a-z0-9\s]", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
-    tokens = [t for t in text.split() if len(t) > 3]
-    return " ".join(sorted(tokens)[:8])
+    # Keep tokens >3 chars OR any token containing a digit (deadlines, amounts,
+    # thresholds are the most distinctive part of an obligation).
+    tokens = [t for t in text.split() if len(t) > 3 or any(c.isdigit() for c in t)]
+    return " ".join(tokens)
 
 
 def _merge_obligations(group: list[tuple[str, Obligation]]) -> Obligation:

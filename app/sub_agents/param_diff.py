@@ -25,42 +25,53 @@ import re
 
 from app.models import AmendedClause, ParameterChange
 
-PARAM_DIFF_INSTRUCTION = """You are a senior prudential-regulation analyst at
-an Indian bank. You are given TWO regulatory documents:
+PARAM_DIFF_INSTRUCTION = """You are a senior regulation analyst at an Indian
+financial institution, reviewing a change from one of RBI / SEBI / IRDAI (or a
+similar regulator). You are given TWO regulatory documents:
 
   * NEW FRAMEWORK — the amending / latest document.
   * PRIOR FRAMEWORK — the consolidated or earlier document it changes.
 
-Your single job: produce an exhaustive, precise table of the QUANTITATIVE
-parameters that MOVED between the prior and the new framework. This is for a
-Chief Compliance Officer who needs to know exactly what numbers changed and
-the effect on regulatory capital — not generic obligations.
+Your single job: produce a precise table of the QUANTITATIVE parameters that
+MOVED between the prior and the new framework. This is for a Chief Compliance
+Officer who needs to know exactly which numbers changed and their effect — not
+generic obligations.
 
-Extract one ParameterChange per moved lever. Look hard for, at minimum:
-  * Risk weights by exposure class (corporate rated/unrated, sovereign,
-    bank, retail, consumer credit / personal loans, residential mortgage,
-    CRE, equity — listed/unlisted, NPA secured/unsecured, startups, MSME,
-    venture capital).
-  * LTV bands / ratios and how they band the risk weight.
-  * Credit conversion factors (CCF) for off-balance-sheet items.
-  * Capital charges (%), capital conservation buffer, CCyB, leverage ratio.
-  * Provisioning rates, haircuts, thresholds, materiality limits.
+A "quantitative parameter" is ANY measurable lever the regulation sets, for
+example (extract whichever apply to THIS document's domain):
+  * Thresholds & limits — monetary limits, materiality thresholds, exposure
+    caps, concentration limits, position limits, shareholding/holding limits.
+  * Timelines & frequencies — reporting/filing deadlines, disclosure windows,
+    cure/remediation periods, updation cycles, retention periods, cooling-off
+    periods, "within N days/hours".
+  * Rates, fees & charges — interest/penalty rates, fees, levies, commissions,
+    haircuts, provisioning rates.
+  * Ratios & percentages — any prescribed %, ratio, or band.
+  * Prudential/capital levers (when the document is prudential) — risk weights
+    by exposure class, LTV bands, credit-conversion factors (CCF), capital
+    charges, capital conservation buffer, CCyB, leverage ratio.
   * Effective / commencement dates and transitional arrangements.
 
 For EACH ParameterChange emit:
-  * parameter       — the lever, e.g. "Risk weight — listed equity exposures".
-  * exposure_class  — the segment it applies to (null if global).
+  * parameter       — the lever, e.g. "Risk weight — listed equity exposures",
+                      "Periodic KYC updation cycle (low-risk)", "Disclosure
+                      window for material events".
+  * exposure_class  — the segment/category it applies to (null if global).
   * old_value       — the value under the PRIOR framework (null if newly
-                      introduced). Quote the number with its unit, e.g. "125%".
-  * new_value       — the value under the NEW framework, e.g. "250%".
+                      introduced). Quote the number with its unit, e.g. "125%",
+                      "10 years", "₹50 lakh", "30 days".
+  * new_value       — the value under the NEW framework, e.g. "250%", "12 years".
   * direction       — increase | decrease | new | removed | restructured |
                       unchanged. Use "restructured" when a flat number becomes
                       a formula/band (e.g. flat 100% → external-rating-banded).
-  * unit            — "%", "bps", "x", "ratio", "LTV band", etc.
+  * unit            — "%", "bps", "x", "ratio", "days", "years", "₹", etc.
   * effective_date  — commencement language exactly as written, if stated.
-  * crar_impact     — the directional capital effect in one phrase, e.g.
-                      "higher risk weight → higher RWA → lower CRAR, all else
-                      equal" or "lower CCF → lower RWA → CRAR relief".
+  * crar_impact     — the directional effect in one phrase. For PRUDENTIAL
+                      levers use the capital chain ("higher risk weight → higher
+                      RWA → lower CRAR"). For non-prudential levers state the
+                      relevant compliance/operational effect instead ("shorter
+                      window → tighter reporting SLA") — never force a capital
+                      framing onto a non-capital change.
   * source_old / source_new — clause or paragraph reference in each document.
   * confidence      — 0.0–1.0; lower when the old value had to be inferred.
   * notes           — any caveat (e.g. "subject to external rating availability").
@@ -71,10 +82,14 @@ Rules:
     old_value to null, direction to "new", and say so in notes.
   * Emit a row ONLY when a value actually MOVED (direction increase, decrease,
     new, removed, or restructured). DO NOT emit rows where old_value equals
-    new_value or direction would be "unchanged" — those waste the response and
-    are not changes. If nothing in a batch moved, return an empty list [].
-  * Prefer many precise rows over a few vague ones. A real credit-risk
-    standardised-approach change has dozens of risk-weight movements.
+    new_value or direction would be "unchanged".
+  * If this document is purely narrative / qualitative and contains NO
+    quantitative parameters (e.g. a conduct or principles circular with no
+    numbers, deadlines, or limits), return an empty list []. Do NOT manufacture
+    parameters from section numbers, form numbers, or clause references.
+  * Prefer many precise rows over a few vague ones where the document is genuinely
+    quantitative (a credit-risk standardised-approach change has dozens of
+    risk-weight movements); but do not pad a sparse document.
   * Do not emit obligations or policy edits here — only parameter movements.
 """
 
