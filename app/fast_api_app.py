@@ -412,17 +412,39 @@ def launch_chain_run(
                 # as a backstop against Spanner's ~2.5MB STRING(MAX) limit;
                 # 800K keeps near-complete context for Q&A reload while
                 # leaving headroom for the full analysis payload.
-                _persist = state.model_copy(
-                    update={
-                        "comparison_text": (state.comparison_text or "")[:800000] or None
+                # Fit under Spanner's 2.5MB STRING(MAX) column limit by
+                # progressively trimming the largest INPUT-text fields
+                # (comparison_text, then the amendment raw_text) — never the
+                # analysis (param_changes, obligations, impact). Guarantees the
+                # completed run persists rather than being lost to a size error.
+                _LIMIT = 2_400_000
+                _state_json = None
+                for _cap in (800000, 300000, 80000, 0):
+                    _upd = {
+                        "comparison_text": ((state.comparison_text or "")[:_cap] or None)
                     }
-                )
+                    _persist = state.model_copy(update=_upd)
+                    if _cap <= 80000 and _persist.amendment:
+                        _persist = _persist.model_copy(
+                            update={
+                                "amendment": _persist.amendment.model_copy(
+                                    update={
+                                        "raw_text": (_persist.amendment.raw_text or "")[
+                                            : max(_cap, 40000)
+                                        ]
+                                    }
+                                )
+                            }
+                        )
+                    _state_json = _persist.model_dump_json()
+                    if len(_state_json.encode("utf-8")) <= _LIMIT:
+                        break
                 save_pipeline_run(
                     pipeline_run_id=pipeline_run_id,
                     amendment_id=_RUNS[pipeline_run_id]["amendment_id"],
                     status="done",
                     clauses_count=_RUNS[pipeline_run_id]["clauses_count"],
-                    state_json=_persist.model_dump_json(),
+                    state_json=_state_json,
                     stats_json=_json.dumps(stats),
                     total_cost_usd=_total_cost,
                 )

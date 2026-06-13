@@ -68,45 +68,72 @@ def save_pipeline_run(
     total_cost_usd: float | None = None,
     stats_json: str | None = None,
 ) -> None:
-    """Persist one completed (or errored) pipeline run. Best-effort, no raise."""
+    """Persist one completed (or errored) pipeline run. Best-effort, no raise.
+
+    Retries transient Spanner errors a few times — a single transient failure
+    (e.g. a credential-refresh blip or "Failed to initialize transaction")
+    otherwise loses a completed run permanently, since this is the only durable
+    write. The state_json column has a hard 2.5MB limit; if the payload is
+    over, the caller is expected to have trimmed it, but we surface that error
+    clearly rather than retrying it (a retry won't help an oversized value).
+    """
     database = _get_database()
     if database is None:
         return
-    try:
-        from google.cloud import spanner  # type: ignore[import-not-found]
+    from google.cloud import spanner  # type: ignore[import-not-found]
 
-        def _txn(transaction) -> None:
-            transaction.insert_or_update(
-                table="pipeline_runs",
-                columns=(
-                    "pipeline_run_id",
-                    "ts",
-                    "amendment_id",
-                    "status",
-                    "clauses_count",
-                    "state_json",
-                    "error",
-                    "total_cost_usd",
-                    "stats_json",
-                ),
-                values=[
-                    (
-                        pipeline_run_id,
-                        spanner.COMMIT_TIMESTAMP,
-                        amendment_id,
-                        status,
-                        clauses_count,
-                        state_json,
-                        error,
-                        total_cost_usd,
-                        stats_json,
-                    )
-                ],
+    def _txn(transaction) -> None:
+        transaction.insert_or_update(
+            table="pipeline_runs",
+            columns=(
+                "pipeline_run_id",
+                "ts",
+                "amendment_id",
+                "status",
+                "clauses_count",
+                "state_json",
+                "error",
+                "total_cost_usd",
+                "stats_json",
+            ),
+            values=[
+                (
+                    pipeline_run_id,
+                    spanner.COMMIT_TIMESTAMP,
+                    amendment_id,
+                    status,
+                    clauses_count,
+                    state_json,
+                    error,
+                    total_cost_usd,
+                    stats_json,
+                )
+            ],
+        )
+
+    import time as _time
+
+    last_exc: Exception | None = None
+    for attempt in range(4):
+        try:
+            database.run_in_transaction(_txn)
+            return
+        except Exception as e:  # noqa: BLE001
+            last_exc = e
+            msg = str(e)
+            # An oversized value won't succeed on retry — fail fast and loud.
+            if "exceeds the maximum size" in msg:
+                LOGGER.error("save_pipeline_run oversized (%s): %s", pipeline_run_id, e)
+                return
+            LOGGER.warning(
+                "save_pipeline_run attempt %d/4 failed (%s): %s",
+                attempt + 1,
+                pipeline_run_id,
+                e,
             )
-
-        database.run_in_transaction(_txn)
-    except Exception as e:  # noqa: BLE001
-        LOGGER.warning("save_pipeline_run failed (%s): %s", pipeline_run_id, e)
+            if attempt < 3:
+                _time.sleep(1.5 * (attempt + 1))
+    LOGGER.error("save_pipeline_run gave up after retries (%s): %s", pipeline_run_id, last_exc)
 
 
 def load_pipeline_run(pipeline_run_id: str) -> dict[str, Any] | None:
