@@ -169,11 +169,12 @@ def real_map(
 def build_agent():  # type: ignore[no-untyped-def]
     from google.adk.agents import Agent
     from google.adk.models import Gemini
-    from app.llm import curator_model_name
+    from app.llm import curator_generation_config, curator_model_name
 
     return Agent(
         name="map_agent",
         model=Gemini(model=curator_model_name()),
+        generate_content_config=curator_generation_config(),
         instruction=MAP_INSTRUCTION,
         description=(
             "Maps each obligation to the best-matching internal policy "

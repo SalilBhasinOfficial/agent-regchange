@@ -124,11 +124,12 @@ def build_critic_agent(critic_name: str):  # type: ignore[no-untyped-def]
     """Construct a single critic ADK Agent. Lazy import keeps import-time GCP-free."""
     from google.adk.agents import Agent
     from google.adk.models import Gemini
-    from app.llm import curator_model_name
+    from app.llm import curator_generation_config, curator_model_name
 
     return Agent(
         name=critic_name,
         model=Gemini(model=curator_model_name()),
+        generate_content_config=curator_generation_config(),
         instruction=_critic_instruction(critic_name),
         description=(
             f"Scores impact and surfaces downstream effects of the change "
@@ -335,11 +336,12 @@ def build_reconciler_agent():  # type: ignore[no-untyped-def]
     """
     from google.adk.agents import Agent
     from google.adk.models import Gemini
-    from app.llm import curator_model_name
+    from app.llm import curator_generation_config, curator_model_name
 
     return Agent(
         name="judge_reconciler",
         model=Gemini(model=curator_model_name()),
+        generate_content_config=curator_generation_config(),
         instruction=RECONCILER_INSTRUCTION,
         description=(
             "Merges the four senior-reviewer-critic ImpactSummary outputs "

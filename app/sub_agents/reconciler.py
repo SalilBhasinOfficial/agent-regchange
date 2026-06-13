@@ -140,11 +140,12 @@ def build_agent():  # type: ignore[no-untyped-def]
     """
     from google.adk.agents import Agent
     from google.adk.models import Gemini
-    from app.llm import curator_model_name
+    from app.llm import curator_generation_config, curator_model_name
 
     return Agent(
         name="reconciler",
         model=Gemini(model=curator_model_name()),
+        generate_content_config=curator_generation_config(),
         instruction=RECONCILER_INSTRUCTION,
         description=(
             "Merges the four stakeholder-lens obligation lists into one "

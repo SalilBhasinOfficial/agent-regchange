@@ -107,11 +107,12 @@ def build_agent():  # type: ignore[no-untyped-def]
     from google.adk.agents import Agent
     from google.adk.models import Gemini
 
-    from app.llm import curator_model_name
+    from app.llm import curator_generation_config, curator_model_name
 
     return Agent(
         name="audit_agent",
         model=Gemini(model=curator_model_name()),
+        generate_content_config=curator_generation_config(),
         instruction=AUDIT_INSTRUCTION,
         description=(
             "Compliance + internal-audit review gate: judges whether the final "

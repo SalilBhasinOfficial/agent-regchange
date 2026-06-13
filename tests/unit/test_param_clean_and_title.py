@@ -99,9 +99,19 @@ def test_title_skips_parenthesised_clause_sentence():
     )
 
 
-def test_title_falls_back_when_no_real_heading():
+def test_title_falls_back_to_prettified_filename_when_no_real_heading():
+    # No parseable title → derive a readable title from the filename stem
+    # rather than exposing the raw stem (general, honest fallback).
     chunks = [_chunk("Index", layout="heading-1")]
-    assert _title_from_chunks(chunks, "the-fallback") == "the-fallback"
+    assert _title_from_chunks(chunks, "the-fallback") == "The Fallback"
+
+
+def test_title_prettifies_rbi_filename_stem():
+    from app.ingest.pipeline import _prettify_filename
+
+    assert _prettify_filename(
+        "05_credit_risk_standardised_2026-04-27_RBI-087798ec1547"
+    ) == "Credit Risk Standardised (RBI · 2026-04-27)"
 
 
 def test_apply_finalization_drops_excluded_and_corrects():

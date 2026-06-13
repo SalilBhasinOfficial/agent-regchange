@@ -251,11 +251,12 @@ def _build_single_judge_agent():  # type: ignore[no-untyped-def]
     """The legacy one-shot judge agent. Used for the single-mode fallback."""
     from google.adk.agents import Agent
     from google.adk.models import Gemini
-    from app.llm import curator_model_name
+    from app.llm import curator_generation_config, curator_model_name
 
     return Agent(
         name="judge_agent_single",
         model=Gemini(model=curator_model_name()),
+        generate_content_config=curator_generation_config(),
         instruction=JUDGE_INSTRUCTION,
         description=(
             "Single-agent impact assessment (legacy/GEPA baseline). The "

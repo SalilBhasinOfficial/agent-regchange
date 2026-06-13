@@ -145,11 +145,12 @@ def build_agent():  # type: ignore[no-untyped-def]
     from google.adk.agents import Agent
     from google.adk.models import Gemini
 
-    from app.llm import curator_model_name
+    from app.llm import curator_generation_config, curator_model_name
 
     return Agent(
         name="finalize_agent",
         model=Gemini(model=curator_model_name()),
+        generate_content_config=curator_generation_config(),
         instruction=FINALIZE_INSTRUCTION,
         description=(
             "Loops compliance + internal-audit observations back into the report "

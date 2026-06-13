@@ -125,11 +125,12 @@ def real_qna(state: AgentState, question: str) -> QnATurn:
 def build_agent():  # type: ignore[no-untyped-def]
     from google.adk.agents import Agent
     from google.adk.models import Gemini
-    from app.llm import curator_model_name
+    from app.llm import curator_generation_config, curator_model_name
 
     return Agent(
         name="qna_agent",
         model=Gemini(model=curator_model_name()),
+        generate_content_config=curator_generation_config(),
         instruction=QNA_INSTRUCTION,
         description=(
             "Answers follow-up questions about a completed regulatory-"

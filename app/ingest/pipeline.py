@@ -139,6 +139,60 @@ _TITLE_KEYWORDS = (
 )
 
 
+# --- Filename prettifier (general fallback when no title is parseable) ------
+# Some documents open with a preamble paragraph and never restate their own
+# name as a heading (observed: a credit-risk SA Direction whose parsed text
+# begins with the Basel-III preamble; the only title-like phrases in the body
+# are cross-references to *other* directions). Rather than risk picking a wrong
+# title from the body, derive a clean, honest title from the source filename —
+# this generalises to any uploaded document, not just RBI ones.
+_FN_TRAILING_HASH = _re.compile(r"[-_][0-9a-fA-F]{8,}$")
+_FN_DATE = _re.compile(r"(20\d\d)[-_](\d{2})[-_](\d{2})")
+_FN_LEAD_INDEX = _re.compile(r"^\d{1,3}[-_]")
+# Letter-only boundaries: ``\b`` treats "_" as a word char, so ``\bRBI\b``
+# fails in "..._RBI-hash". Look-arounds keyed on letters make digits, "_", "-"
+# all act as separators.
+_FN_SOURCE = _re.compile(
+    r"(?<![A-Za-z])(RBI|SEBI|IRDAI|NABARD|NHB|PFRDA|FSSAI|MCA)(?![A-Za-z])",
+    _re.IGNORECASE,
+)
+_FN_HEX_TOKEN = _re.compile(r"^[0-9a-fA-F]{6,}$")
+
+
+def _prettify_filename(stem: str) -> str:
+    """Turn a source filename stem into a readable, honest title.
+
+    ``05_credit_risk_standardised_2026-04-27_RBI-087798ec1547``
+        -> ``Credit Risk Standardised (RBI · 2026-04-27)``
+    Best-effort: an opaque stem (``scan001``) degrades to ``Scan001``.
+    """
+    if not stem:
+        return stem
+    s = stem
+    m_date = _FN_DATE.search(s)
+    date = "-".join(m_date.groups()) if m_date else None
+    m_src = _FN_SOURCE.search(s)
+    src = m_src.group(1).upper() if m_src else None
+    s = _FN_TRAILING_HASH.sub("", s)  # drop trailing content hash
+    s = _FN_LEAD_INDEX.sub("", s)  # drop leading "05_" index
+    s = _FN_DATE.sub(" ", s)  # remove the whole date token before splitting
+    words = [w for w in _re.split(r"[-_\s]+", s) if w]
+    keep: list[str] = []
+    for w in words:
+        if _FN_HEX_TOKEN.match(w):  # stray hash fragment
+            continue
+        if _re.fullmatch(r"\d{1,4}", w):  # leftover date/number fragments
+            continue
+        if _FN_SOURCE.fullmatch(w):  # source goes into the suffix instead
+            continue
+        keep.append(w[:1].upper() + w[1:] if w.islower() else w)
+    name = " ".join(keep).strip()
+    suffix = " · ".join(b for b in (src, date) if b)
+    if name and suffix:
+        return f"{name} ({suffix})"
+    return name or stem
+
+
 def _looks_like_title(text: str) -> bool:
     t = text.strip()
     # A real document title is a short noun phrase, not a sentence/paragraph.
@@ -198,7 +252,9 @@ def _title_from_chunks(chunks: list[ChunkedSection], fallback: str) -> str:
             return c[:200]
     if candidates:
         return candidates[0][:200]
-    return fallback
+    # No parseable title in the document — derive a clean one from the filename
+    # rather than exposing the raw stem (general, honest fallback).
+    return _prettify_filename(fallback)
 
 
 # ---------------------------------------------------------------------------
