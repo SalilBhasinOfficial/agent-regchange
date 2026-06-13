@@ -95,6 +95,10 @@ def _clean_param_changes(rows: list[ParameterChange]) -> list[ParameterChange]:
         # Not a movement: explicitly unchanged, or old == new with no signal.
         if direction == "unchanged":
             continue
+        # A "removed" row with no original value is unverifiable noise (the
+        # model can't cite what was removed) — drop it.
+        if direction == "removed" and not old_v:
+            continue
         if old_v and new_v and old_v == new_v and direction not in {"new", "removed"}:
             continue
         key = (
@@ -188,7 +192,14 @@ def real_param_diff(
         log = logging.getLogger(__name__)
         result = prediff(split_paragraphs(comparison_text), split_paragraphs(new_full))
         log.info("param_diff: %s", result.summary())
-        changes = result.ordered_changes()
+        # Only feed SUBSTANTIVE changes (modified + added) to the model. A
+        # "removed" block is prior-framework text not restated in the new doc —
+        # when a 3-page amendment is diffed against a 400-page master, almost
+        # the entire master reads as "removed", producing hundreds of
+        # unverifiable null-old "removed parameters" (observed: 388/425). Genuine
+        # value changes are "modified"; genuinely new levers are "added".
+        # Withdrawals belong in the impact narrative, not as null-valued rows.
+        changes = [c for c in result.ordered_changes() if c.kind != "removed"]
         if changes:
             batch_size = int(os.environ.get("CURATOR_PARAM_DIFF_BATCH", "60"))
             agent = build_agent()

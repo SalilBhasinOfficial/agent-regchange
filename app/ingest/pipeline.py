@@ -99,43 +99,97 @@ _NON_TITLE_HEADINGS = frozenset(
         "appendix",
         "preamble",
         "notification",
+        "preliminary",
+        "commencement",
+        "short title",
+        "short title and commencement",
+        "powers exercised and commencement",
+        "definitions",
+        "introduction",
+        "applicability",
+        "scope of application",
+        "powers exercised",
     }
+)
+
+# A heading that starts like a numbered/structural clause is not the document
+# title: "2. Powers Exercised…", "Chapter I Preliminary", "Section 3", "Part A".
+import re as _re
+
+_STRUCTURAL_PREFIX = _re.compile(
+    r"^\s*("
+    r"\d+(\.\d+)*[\.\)]?\s|"  # 1.  2.3)  etc.
+    r"(chapter|section|part|clause|article|para(graph)?|schedule|annex(ure)?)\b"
+    r")",
+    _re.IGNORECASE,
+)
+
+# Words that signal an actual regulatory-document name.
+_TITLE_KEYWORDS = (
+    "direction",
+    "circular",
+    "regulation",
+    "guideline",
+    "framework",
+    "master ",
+    "act,",
+    " act ",
+    "reserve bank of india",
+    "notification no",
 )
 
 
 def _looks_like_title(text: str) -> bool:
     t = text.strip()
-    if len(t) < 6:
+    if len(t) < 10:
         return False
     low = t.lower().strip(" .:-")
     if low in _NON_TITLE_HEADINGS:
         return False
-    # A materialised table (pipe-delimited rows) or a TOC dump is not a title.
+    # Materialised table (pipe rows) or a multi-line dump is not a title.
     if "|" in t or t.count("\n") > 1:
+        return False
+    # Numbered / structural clause headings are not the document name.
+    if _STRUCTURAL_PREFIX.match(t):
         return False
     return True
 
 
 def _title_from_chunks(chunks: list[ChunkedSection], fallback: str) -> str:
-    """Pick the first real heading as the document title.
+    """Pick the document's actual name as the title.
 
-    Skips structural headings (table of contents, index, annex…) and
-    materialised tables so the title is the document's actual name, not the
-    first piece of front-matter.
+    Prefers a heading that reads like a regulatory-document name (contains
+    "Directions", "Circular", "Reserve Bank of India"…); otherwise the first
+    title-like heading. Skips front-matter (TOC, preliminary, definitions),
+    numbered/structural clause headings, and materialised tables.
     """
-    for ch in chunks:
-        if (
-            ch.layout_type in {"title", "subtitle", "heading-1", "heading-2"}
-            and _looks_like_title(ch.text)
-        ):
-            return ch.text.strip()
-    # Fallback: first non-empty, title-like line.
-    for ch in chunks:
-        if ch.layout_type == "table":
+    headings = [
+        ch.text.strip()
+        for ch in chunks[:40]
+        if ch.layout_type in {"title", "subtitle", "heading-1", "heading-2"}
+        and _looks_like_title(ch.text)
+    ]
+    # First choice: a heading that names a regulatory instrument.
+    for h in headings:
+        low = h.lower()
+        if any(k in low for k in _TITLE_KEYWORDS):
+            return h[:200]
+    # Second: the first title-like heading.
+    if headings:
+        return headings[0][:200]
+    # Fallback: first title-like non-table line, preferring keyword lines.
+    candidates: list[str] = []
+    for ch in chunks[:60]:
+        if ch.layout_type == "table" or not ch.text.strip():
             continue
-        line = ch.text.strip().splitlines()[0] if ch.text.strip() else ""
+        line = ch.text.strip().splitlines()[0]
         if _looks_like_title(line):
-            return line[:200]
+            candidates.append(line)
+    for c in candidates:
+        if any(k in c.lower() for k in _TITLE_KEYWORDS):
+            return c[:200]
+    if candidates:
+        return candidates[0][:200]
     return fallback
 
 
