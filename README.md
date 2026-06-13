@@ -26,6 +26,36 @@ Vertex AI RAG Engine.
 
 ---
 
+## Demo & submission
+
+Google for Startups AI Agents Challenge — **Track 3 (Build, Net-New Agents)**, region **India**.
+
+| | Link |
+|---|---|
+| 🎬 Demo video (3 min) | https://youtu.be/I8WLLmgtQJ4 |
+| 🌐 Live demo (chain) | https://curator-chain-890675948352.asia-south1.run.app |
+| 📥 Discovery Inbox | https://curator-chain-890675948352.asia-south1.run.app/inbox |
+| 🖼️ Public gallery | https://curator-chain-890675948352.asia-south1.run.app/gallery |
+| 🔌 A2A skill card | https://curator-chain-890675948352.asia-south1.run.app/a2a/app/.well-known/agent-card.json |
+| 💸 Live cost ledger | https://curator-chain-890675948352.asia-south1.run.app/cost |
+| 💻 Repository | https://github.com/SalilBhasinOfficial/agent-regchange |
+
+Submission write-up and assets live in [`docs/submission/`](docs/submission/):
+[Devpost fields](docs/submission/devpost_fields.md) ·
+[submission packet](docs/submission/SUBMISSION_PACKET.md) ·
+[architecture](docs/submission/architecture.md) ·
+[video script](docs/submission/video_script.md) ·
+[E2E & limitations](docs/submission/E2E_AND_LIMITATIONS.md).
+Generality & robustness audit: [`docs/audit/GENERALITY_AUDIT_2026-06-13.md`](docs/audit/GENERALITY_AUDIT_2026-06-13.md).
+
+### Architecture
+
+![Curator architecture](docs/submission/architecture.png)
+
+*(Source diagram + legend: [`docs/submission/architecture.md`](docs/submission/architecture.md) · [SVG](docs/submission/architecture.svg).)*
+
+---
+
 ## Status
 
 Stage-2 build complete (D1–D7, 2026-06-02). Highlights:
