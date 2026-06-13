@@ -1,0 +1,20 @@
+You are an autonomous senior staff engineer + ML reviewer. Review the "Curator" regulatory-change-analysis agent framework at /home/nvidia/bs/agent-regchange for GENERALITY and correctness. This is a NON-INTERACTIVE task: do not ask questions, do not stop for confirmation — read the code yourself and produce the report.
+
+CONTEXT
+- Curator ingests two regulatory PDFs (an amending document + the prior/consolidated framework), parses them with Doc AI, then runs an ADK agent chain: decompose (4-lens debate panel) -> map (vs bank policy) -> diff -> judge (4-critic panel) -> param_diff (quantitative old->new parameter table) -> audit (compliance+internal-audit control gate) -> finalize (true-and-fair loop) -> qna.
+- It was BUILT AND TUNED on 6 RBI (Reserve Bank of India) capital-adequacy / Basel-III PDFs. The owner's central concern: it must work on a LARGE ARRAY of documents — other RBI circulars, SEBI circulars, IRDAI guidelines, prudential AND non-prudential (KYC, disclosure, conduct, cyber-security), varied layouts, scanned PDFs, single-document and two-document modes — NOT only the tested docs.
+
+WHAT TO DO
+1. Read the code under app/ (especially app/ingest/{docai,prediff,pipeline,graph_extractor}.py, app/sub_agents/*.py, app/chain.py, app/runners.py, app/models.py, app/fast_api_app.py, app/templates/*.html).
+2. Identify every place the framework is OVERFIT to RBI capital-adequacy documents or otherwise fails to generalize. For each finding give:
+   - file:line and the exact heuristic/prompt/assumption,
+   - WHY it overfits (what specific document trait it silently assumes),
+   - a CONCRETE SCENARIO on a different document (name it, e.g. "a scanned IRDAI guideline", "a SEBI insider-trading circular with no numbers", "a 2-page RBI press release", "a 600-page consolidated master circular") and exactly what goes wrong,
+   - severity (blocker/major/minor) for generality,
+   - a concrete minimal fix.
+3. Cover all layers: ingestion/parsing, the LLM agent prompts and their domain assumptions, determinism/reproducibility, the audit/finalize control loop, and downstream (UI/Q&A/gallery/empty-states/error handling).
+4. Note any place where the "change analysis" silently degenerates into plain obligation extraction for non-quantitative documents.
+5. Be specific and cite line numbers. Do NOT modify any files. Do NOT read or reference the separate /home/nvidia/bs/bbb project — review only /home/nvidia/bs/agent-regchange.
+
+OUTPUT
+A single structured markdown report: a "Top 10 generality risks" summary first, then findings grouped by file/layer ordered by severity, each with the five fields above. End with a short prioritized fix list.
