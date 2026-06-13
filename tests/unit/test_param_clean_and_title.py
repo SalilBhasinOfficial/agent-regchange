@@ -28,9 +28,9 @@ def test_clean_drops_equal_old_new_even_if_not_labelled_unchanged():
     assert _clean_param_changes(rows) == []
 
 
-def test_clean_keeps_introduced_rows_when_nothing_is_proven():
-    # No increase/decrease/restructured and no prior-value rows → the run would
-    # otherwise be empty, so the introduced "new" rows are kept (capad case).
+def test_clean_keeps_new_rows_without_prior_text():
+    # Cannot verify "new" rows without the prior framework text → keep them all
+    # (a brand-new-table amendment must not be blanked).
     rows = [
         _pc("Add-on factor A", None, "0.25", "new"),
         _pc("Add-on factor B", None, "0.50", "new"),
@@ -39,19 +39,35 @@ def test_clean_keeps_introduced_rows_when_nothing_is_proven():
     assert len(out) == 2
 
 
-def test_clean_drops_null_old_new_when_a_proven_move_exists():
-    # creditrisk case: a genuine movement is present, so the null-old "new"
-    # restatement noise is suppressed and only verified diffs remain.
+def test_clean_drops_restatements_present_in_prior_but_keeps_genuine_new():
+    # Evidence-based: a null-old "new" row whose concept already appears in the
+    # prior text is a restatement (drop); one whose concept is absent is
+    # genuinely new (keep). Movements and prior-citing rows always survive.
+    prior = "The risk weight for Central Government exposures shall be 0%."
     rows = [
-        _pc("Risk weight — Central Govt", None, "0%", "new"),  # restatement noise
-        _pc("Equity RW", "125%", "250%", "increase"),  # proven movement
-        _pc("Old levy", "1%", "0%", "removed"),  # cites a prior value → kept
+        _pc("Risk weight — Central Government", None, "0%", "new"),  # in prior → drop
+        _pc("Risk weight — Startup ventures", None, "150%", "new"),  # absent → keep
+        _pc("Equity RW", "125%", "250%", "increase"),  # movement → keep
+        _pc("Old levy", "1%", "0%", "removed"),  # cites prior value → keep
     ]
-    out = _clean_param_changes(rows)
+    out = _clean_param_changes(rows, comparison_text=prior)
     params = {r.parameter for r in out}
+    assert "Risk weight — Central Government" not in params
+    assert "Risk weight — Startup ventures" in params
     assert "Equity RW" in params
     assert "Old levy" in params
-    assert "Risk weight — Central Govt" not in params
+
+
+def test_clean_empty_guard_keeps_all_when_everything_is_a_restatement():
+    # capad case: prior (post-amendment master) contains every concept, so all
+    # rows look like restatements — the empty-guard keeps them rather than blank.
+    prior = "add-on factor for market related off balance sheet items table"
+    rows = [
+        _pc("Add-on factor market related off balance sheet", None, "0.25", "new"),
+        _pc("Add-on factor market related off balance sheet items", None, "0.50", "new"),
+    ]
+    out = _clean_param_changes(rows, comparison_text=prior)
+    assert len(out) == 2
 
 
 def test_clean_dedupes():
@@ -147,3 +163,34 @@ def test_apply_finalization_drops_excluded_and_corrects():
     assert st.impact.priority == "high"
     assert st.impact.summary == "Balanced final view."
     assert st.finalization is not None
+
+
+def test_audit_calibration_severity_based_verdict():
+    from app.models import AuditFinding, AuditReport
+    from app.sub_agents.audit import _calibrate_verdict
+
+    def rpt(severities):
+        return AuditReport(
+            verdict="review",  # wrong on purpose — override should fix it
+            publishable=False,
+            compliance_summary="c",
+            audit_summary="a",
+            findings=[
+                AuditFinding(severity=s, category="data_quality", item="i", detail="d")
+                for s in severities
+            ],
+            confidence=0.9,
+        )
+
+    # info/minor only → pass, publishable
+    r = _calibrate_verdict(rpt(["info", "minor"]))
+    assert r.verdict == "pass" and r.publishable is True
+    # any major (no blocker) → review, still publishable
+    r = _calibrate_verdict(rpt(["minor", "major"]))
+    assert r.verdict == "review" and r.publishable is True
+    # any blocker → fail, not publishable
+    r = _calibrate_verdict(rpt(["major", "blocker"]))
+    assert r.verdict == "fail" and r.publishable is False
+    # no findings → pass
+    r = _calibrate_verdict(rpt([]))
+    assert r.verdict == "pass" and r.publishable is True

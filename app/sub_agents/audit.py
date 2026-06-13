@@ -39,21 +39,63 @@ obligation count + sample, impact). Do NOT rewrite it. Judge whether it is fit
 to publish and list what a human must resolve first.
 
 Emit an AuditReport:
-  * verdict — "pass" (clean), "review" (publishable with caveats), or "fail"
-    (do not publish — serious data-quality or accuracy problems).
-  * publishable — false if there is any "blocker" finding.
+  * verdict — calibrate by the WORST finding severity, not by whether any
+    finding exists:
+      - "pass"   — no major or blocker findings (info/minor notes are normal
+                   and expected on real documents; they do NOT block a pass).
+      - "review" — at least one "major" finding (publishable with caveats a
+                   human should weigh).
+      - "fail"   — at least one "blocker" finding (do not publish).
+  * publishable — true unless there is a "blocker" finding.
   * compliance_summary — the compliance officer's one-paragraph verdict.
   * audit_summary — the internal auditor's one-paragraph verdict on data quality.
   * findings — each with severity (info/minor/major/blocker), category, the
-    item, and what to check. FLAG, for example: a TOC/front-matter title;
-    parameter rows that are not real quantitative levers or where old == new;
-    an implausible number of changes; boilerplate obligations ("comply with the
-    directions"); internal inconsistency (priority HIGH with no material change).
+    item, and what to check. FLAG, for example: a TOC/front-matter title
+    (blocker); parameter rows that are not real quantitative levers or where
+    old == new (major); an implausible number of changes (major); boilerplate
+    obligations "comply with the directions" (minor); internal inconsistency
+    such as priority HIGH with no material change (major).
   * confidence — 0..1.
 
-Be specific and terse. A genuinely clean package gets verdict "pass",
-publishable true, and an empty findings list — do not invent problems.
+Severity discipline — do NOT inflate severity:
+  * The absence of an internal bank-policy corpus in a DOCUMENT-vs-DOCUMENT
+    comparison (had_internal_policy_corpus = false, is_document_comparison =
+    true) is an expected SCOPING NOTE, severity "info" — NOT a coverage gap,
+    NOT a defect. Coverage mapping simply isn't in scope for that run.
+  * Obligations being "missing" internal-policy coverage is only a finding when
+    a policy corpus WAS provided.
+  * "newly introduced" parameters (genuine additions with no prior value) are
+    legitimate, not junk — flag them only if they look fabricated.
+
+Be specific and terse. A clean, well-grounded package with only info/minor
+notes gets verdict "pass", publishable true. Do not invent problems.
 """
+
+
+_SEVERITY_RANK = {"info": 0, "minor": 1, "major": 2, "blocker": 3}
+
+
+def _calibrate_verdict(report: AuditReport) -> AuditReport:
+    """Derive verdict + publishable deterministically from finding severities.
+
+    The LLM's self-assigned verdict was a stuck gate — it tended to "review"
+    on essentially every document because *any* finding (even an info-level
+    scoping note) read as "not clean". We override it with a consistent rule
+    keyed only on the worst severity actually present, so the gate discriminates
+    real quality: blocker → fail/unpublishable; major → review; otherwise pass.
+    Findings, summaries and confidence from the model are preserved.
+    """
+    worst = max(
+        (_SEVERITY_RANK.get((f.severity or "").strip().lower(), 0) for f in report.findings),
+        default=0,
+    )
+    if worst >= _SEVERITY_RANK["blocker"]:
+        report.verdict, report.publishable = "fail", False
+    elif worst >= _SEVERITY_RANK["major"]:
+        report.verdict, report.publishable = "review", True
+    else:
+        report.verdict, report.publishable = "pass", True
+    return report
 
 
 def stub_audit(state: AgentState) -> AuditReport:
@@ -100,7 +142,8 @@ def real_audit(state: AgentState) -> AuditReport:
         "Produce the AuditReport per your instructions."
     )
     agent = build_agent()
-    return run_agent(agent, prompt, output_schema=AuditReport)
+    report = run_agent(agent, prompt, output_schema=AuditReport)
+    return _calibrate_verdict(report)
 
 
 def build_agent():  # type: ignore[no-untyped-def]

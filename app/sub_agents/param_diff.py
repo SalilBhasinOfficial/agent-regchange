@@ -21,6 +21,7 @@ LLM); the canonical smoke line is unaffected.
 from __future__ import annotations
 
 import os
+import re
 
 from app.models import AmendedClause, ParameterChange
 
@@ -78,13 +79,37 @@ Rules:
 """
 
 
-# Directions that represent a *verified* old→new movement: both sides are
-# anchored in the text (a number moved, or a flat value became a band/formula).
-_PROVEN_DIRECTIONS = frozenset({"increase", "decrease", "restructured"})
+# Generic prudential vocabulary that does NOT distinguish one parameter from
+# another — excluded when fingerprinting a row's concept against the prior text.
+_GENERIC_PARAM_WORDS = frozenset(
+    {
+        "risk", "weight", "weights", "rate", "rates", "ratio", "ratios",
+        "factor", "factors", "exposure", "exposures", "capital", "charge",
+        "charges", "value", "values", "minimum", "maximum", "requirement",
+        "requirements", "limit", "limits", "band", "bands", "cent", "percent",
+        "amount", "level", "threshold", "thresholds", "applicable", "general",
+    }
+)
 
 
-def _clean_param_changes(rows: list[ParameterChange]) -> list[ParameterChange]:
-    """Drop non-changes/duplicates, then prefer *proven* movements.
+def _distinctive_tokens(*fields: str | None) -> set[str]:
+    """Content words (len>3, non-generic, non-numeric) that name a concept."""
+    toks: set[str] = set()
+    for f in fields:
+        for w in re.split(r"[^a-z0-9]+", (f or "").lower()):
+            if len(w) > 3 and not w.isdigit() and w not in _GENERIC_PARAM_WORDS:
+                toks.add(w)
+    return toks
+
+
+def _normalize_for_match(text: str | None) -> str:
+    return re.sub(r"\s+", " ", (text or "").lower())
+
+
+def _clean_param_changes(
+    rows: list[ParameterChange], *, comparison_text: str | None = None
+) -> list[ParameterChange]:
+    """Drop non-changes/duplicates, then suppress restatements of prior text.
 
     Two passes:
 
@@ -92,17 +117,19 @@ def _clean_param_changes(rows: list[ParameterChange]) -> list[ParameterChange]:
        5.5%→5.5%), ``removed`` rows with no original value, mislabelled
        old==new rows, and cross-batch duplicates (observed: 470 raw rows, 241
        'unchanged').
-    2. *Proven-movement* gate — a ``new`` row carries a null ``old_value`` by
-       definition, so it is a parameter *stated* in the new framework, not a
-       *verified* old→new diff. When the diff aligned a restatement into an
-       "added" block (common: a credit-risk SA Direction repeats Basel weights
-       in different wording) the model emits it as ``new`` with no prior value.
-       These dominate the count and the audit correctly blocks on them. So
-       when the extraction contains any genuine movement (increase / decrease /
-       restructured), drop the null-old ``new`` noise and surface only the
-       verified diffs. If *nothing* is proven (e.g. a short amendment that only
-       introduces a brand-new table), keep the introduced rows so the run is
-       not left empty — those are then honestly framed as "newly introduced".
+    2. *Evidence-based restatement suppression* — a ``new`` row carries a null
+       ``old_value`` by definition. It is only *genuinely* new if its concept is
+       ABSENT from the prior framework. When the pre-diff aligns a restatement
+       into an "added" block (common: a credit-risk SA Direction repeats Basel
+       weights in different wording), the model emits a null-old ``new`` row for
+       a parameter that already existed — so we drop a ``new`` row only when ALL
+       its distinctive tokens (parameter + exposure_class, minus generic words)
+       already appear in the prior text. Rows that cite a prior value, or are
+       increase/decrease/restructured movements, are always kept. This replaces
+       the earlier all-or-nothing global flip, which wrongly discarded genuinely
+       new levers whenever any single movement existed. Empty-guard: if this
+       would drop everything (a brand-new-table amendment, or no prior text),
+       keep the cleaned set so the run is never blanked.
     """
     seen: set[tuple] = set()
     cleaned: list[ParameterChange] = []
@@ -130,15 +157,23 @@ def _clean_param_changes(rows: list[ParameterChange]) -> list[ParameterChange]:
         seen.add(key)
         cleaned.append(r)
 
-    proven = [
-        r
-        for r in cleaned
-        if (r.direction or "").strip().lower() in _PROVEN_DIRECTIONS
-        or (r.old_value or "").strip()  # any row that cites a prior value
-    ]
-    # Prefer verified movements; fall back to the full set only when there is
-    # nothing proven to show (so a brand-new-table amendment isn't blanked out).
-    return proven if proven else cleaned
+    prior = _normalize_for_match(comparison_text)
+
+    def _is_restatement(r: ParameterChange) -> bool:
+        if (r.direction or "").strip().lower() != "new":
+            return False
+        if (r.old_value or "").strip():  # cites a prior value → keep
+            return False
+        if not prior:  # can't verify without prior text → keep
+            return False
+        toks = _distinctive_tokens(r.parameter, r.exposure_class)
+        if not toks:
+            return False
+        # The concept already exists in the prior framework → not genuinely new.
+        return all(t in prior for t in toks)
+
+    kept = [r for r in cleaned if not _is_restatement(r)]
+    return kept if kept else cleaned
 
 
 def stub_param_diff(
@@ -253,7 +288,7 @@ def real_param_diff(
                     all_changes.extend(rows)
                 except Exception as exc:  # noqa: BLE001 — one bad batch ≠ lost run
                     log.warning("param_diff batch %d/%d failed: %s", bi + 1, n_batches, exc)
-            cleaned = _clean_param_changes(all_changes)
+            cleaned = _clean_param_changes(all_changes, comparison_text=comparison_text)
             log.info(
                 "param_diff: %d raw → %d real parameter changes across %d batch(es).",
                 len(all_changes),
@@ -279,7 +314,8 @@ def real_param_diff(
 
     agent = build_agent()
     return _clean_param_changes(
-        run_agent(agent, prompt, output_schema=list[ParameterChange])
+        run_agent(agent, prompt, output_schema=list[ParameterChange]),
+        comparison_text=comparison_text,
     )
 
 

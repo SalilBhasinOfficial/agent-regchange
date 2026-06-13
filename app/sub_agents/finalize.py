@@ -130,9 +130,19 @@ def review_and_finalize(state: AgentState, *, max_loops: int = 1) -> None:
     """
     from app.sub_agents.audit import real_audit
 
+    def _actionable(report: AuditReport | None) -> bool:
+        # Only loop back for findings a human would actually require fixing —
+        # major/blocker. Info/minor notes are expected on real documents and a
+        # "pass" should not trigger a finalize pass (wasted LLM calls + risk of
+        # over-remediation).
+        return bool(report) and any(
+            (f.severity or "").strip().lower() in {"major", "blocker"}
+            for f in report.findings
+        )
+
     state.audit = real_audit(state)
     loops = 0
-    while state.audit and state.audit.findings and loops < max_loops:
+    while _actionable(state.audit) and loops < max_loops:
         fin = real_finalize(state)
         apply_finalization(state, fin)
         # Re-audit the finalized report so the published verdict reflects the
