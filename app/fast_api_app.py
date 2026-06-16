@@ -37,6 +37,15 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+# The google-cloud-spanner client ships a built-in client-side metrics
+# exporter that pushes to Cloud Monitoring on every session checkout. On
+# Cloud Run those exports time out ("Failed to export metrics: deadline
+# exceeded"), spamming logs and adding latency to the persistence path.
+# Disable it before any spanner.Client is constructed (lazy local imports
+# elsewhere all run after this module loads). Opt back in by exporting the
+# env var =false explicitly.
+os.environ.setdefault("SPANNER_DISABLE_BUILTIN_METRICS", "true")
+
 import google.auth
 from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -119,7 +128,11 @@ app: FastAPI = get_fast_api_app(
     artifact_service_uri=artifact_service_uri,
     allow_origins=allow_origins,
     session_service_uri=session_service_uri,
-    otel_to_cloud=True,
+    # OTEL→Cloud Trace export is OFF by default: on Cloud Run the exporter
+    # repeatedly fails (SSL-EOF to telemetry.googleapis.com) and the retry
+    # latency starves the request threads on long large-doc runs. Opt back in
+    # with CURATOR_OTEL_TO_CLOUD=1 only when actively debugging traces.
+    otel_to_cloud=os.getenv("CURATOR_OTEL_TO_CLOUD", "0") == "1",
 )
 app.title = "curator-agent"
 app.description = (

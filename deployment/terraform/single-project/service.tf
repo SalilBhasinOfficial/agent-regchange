@@ -95,6 +95,19 @@ resource "google_cloud_run_v2_service" "app" {
         name  = "SPANNER_DATABASE"
         value = "curator"
       }
+      # Silence the Spanner client's built-in Cloud Monitoring metrics
+      # exporter — it deadline-exceeds on Cloud Run, spamming logs and
+      # adding latency to the persistence path.
+      env {
+        name  = "SPANNER_DISABLE_BUILTIN_METRICS"
+        value = "true"
+      }
+      # OTEL→Cloud Trace export is opt-in; the exporter SSL-EOFs on Cloud
+      # Run and starves request threads on long large-doc runs.
+      env {
+        name  = "CURATOR_OTEL_TO_CLOUD"
+        value = "0"
+      }
     }
 
     service_account = google_service_account.app_sa.email
