@@ -48,7 +48,7 @@ os.environ.setdefault("SPANNER_DISABLE_BUILTIN_METRICS", "true")
 
 import google.auth
 from fastapi import FastAPI, File, Form, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from google.adk.cli.fast_api import get_fast_api_app
@@ -179,6 +179,27 @@ def _pdf_pages(path: Path) -> int | None:
 # --------------------------------------------------------------------------
 # Pages
 # --------------------------------------------------------------------------
+
+
+@app.get("/.well-known/agent.json")
+@app.get("/.well-known/agent-card.json")
+def root_agent_card() -> JSONResponse:
+    """Serve the A2A AgentCard at the root well-known path.
+
+    The bundled ``a2a`` lib now mounts the canonical card under a
+    per-app namespace (``/a2a/app/.well-known/agent-card.json``) and
+    renamed the file from ``agent.json`` → ``agent-card.json``. Our
+    README, Devpost write-up, and demo video all point evaluators at the
+    legacy root path ``/.well-known/agent.json``, so we serve the same
+    card there too — keeping every documented link live. The card on
+    disk already has its ``url`` rewritten by ``_templatize_agent_card``.
+    """
+    import json
+
+    try:
+        return JSONResponse(json.loads(AGENT_CARD_PATH.read_text()))
+    except Exception:  # noqa: BLE001 — best-effort; card is non-critical to the UI
+        return JSONResponse({"error": "agent card unavailable"}, status_code=503)
 
 
 @app.get("/", response_class=HTMLResponse)
