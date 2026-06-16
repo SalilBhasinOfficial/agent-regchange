@@ -124,8 +124,6 @@ def real_map(
     from app.runners import require_real_llm, run_agent
     require_real_llm("map")
 
-    agent = build_agent()
-
     # Flatten sections from all policies (built once, reused per prompt).
     sections = [s for p in policies for s in p.sections]
     sections_text = "\n".join(
@@ -149,6 +147,10 @@ def real_map(
         )
 
     def _map_one(obl: Obligation) -> PolicyMatch:
+        # Per-call agent: a shared ADK agent's asyncio.Lock binds to the first
+        # worker's fresh event loop, so reuse from another worker raises "Lock
+        # is bound to a different event loop" and fails the run.
+        agent = build_agent()
         res = run_agent(agent, _format_prompt(obl), output_schema=PolicyMatch)
         res.obligation_id = obl.id
         if res.coverage == "missing":

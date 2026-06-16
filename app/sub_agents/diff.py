@@ -119,8 +119,6 @@ def real_diff(
     from app.runners import require_real_llm, run_agent
     require_real_llm("diff")
 
-    agent = build_agent()
-
     obl_by_id = {o.id: o for o in obligations}
     section_map = {
         s.policy_section_id: s for p in policies for s in p.sections
@@ -145,6 +143,12 @@ def real_diff(
         obl, section_id, current_heading, current_text = _resolve_target(m)
         if obl is None:
             return None
+        # Build the agent PER worker call. Each ThreadPoolExecutor worker runs
+        # run_agent in its own fresh event loop; a single shared ADK agent
+        # carries an asyncio.Lock bound to the first loop that touches it, so a
+        # second worker raises "Lock is bound to a different event loop" and
+        # fails the whole run (observed on large multi-clause comparisons).
+        agent = build_agent()
         prompt = (
             f"Policy Section Details:\n"
             f"  Section ID: {section_id}\n"
