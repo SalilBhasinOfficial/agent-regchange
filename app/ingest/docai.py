@@ -24,6 +24,7 @@ resolve ``parent_heading`` with a single forward pass.
 
 from __future__ import annotations
 
+import hashlib
 import os
 from pathlib import Path
 from typing import Any
@@ -406,6 +407,43 @@ def parse_pdf(
     if sidecar_chunks is not None:
         return sidecar_chunks
 
+    raw_bytes = pdf_path.read_bytes()
+
+    # Spanner parse cache (keyed on the PDF's sha256): a re-run of the same
+    # document — or the same Master Direction reused across many amendments —
+    # skips the slow, paid Doc AI re-parse entirely (a 412-page doc is ~15 Doc
+    # AI calls). Best-effort: a miss or any error falls through to a live parse.
+    # chunk_id is re-derived from the CURRENT doc_id so cached chunks stay
+    # consistent with this run. Disable with CURATOR_PARSE_CACHE=0.
+    _use_cache = os.environ.get("CURATOR_PARSE_CACHE", "1") != "0"
+    pdf_sha = hashlib.sha256(raw_bytes).hexdigest() if _use_cache else None
+    if pdf_sha:
+        try:
+            from app.observability.pipeline_store import parse_cache_get
+
+            cached = parse_cache_get(pdf_sha)
+        except Exception:  # noqa: BLE001
+            cached = None
+        if cached:
+            import logging
+
+            logging.getLogger(__name__).info(
+                "docai.parse_pdf: parse-cache HIT for %s (%d chunks) — skipping Doc AI.",
+                pdf_path.name,
+                len(cached),
+            )
+            return [
+                ChunkedSection(
+                    text=c["text"],
+                    layout_type=c["layout_type"],
+                    page_start=c["page_start"],
+                    page_end=c["page_end"],
+                    chunk_id=f"{doc_id}#chunk-{i:04d}",
+                    parent_heading=c.get("parent_heading"),
+                )
+                for i, c in enumerate(cached)
+            ]
+
     resolved_processor = processor_id or os.environ.get(_PROCESSOR_ENV_VAR)
     if not resolved_processor:
         raise RuntimeError(
@@ -417,9 +455,6 @@ def parse_pdf(
     # The client uses a regional endpoint — Doc AI requires this.
     client_options = {"api_endpoint": f"{location}-documentai.googleapis.com"}
     client = documentai.DocumentProcessorServiceClient(client_options=client_options)
-
-    with pdf_path.open("rb") as fh:
-        raw_bytes = fh.read()
 
     # Doc AI's online endpoint hard-caps at 30 processed pages. For larger
     # documents, split into <=30-page parts, process each, and stitch with
@@ -535,6 +570,29 @@ def parse_pdf(
                 raw_layout=sec["raw"] if include_raw else None,
             )
         )
+
+    # Populate the parse cache so the next run of this PDF skips Doc AI.
+    if pdf_sha:
+        try:
+            from app.observability.pipeline_store import parse_cache_put
+
+            parse_cache_put(
+                pdf_sha,
+                doc_id,
+                page_count,
+                [
+                    {
+                        "text": r.text,
+                        "layout_type": r.layout_type,
+                        "page_start": r.page_start,
+                        "page_end": r.page_end,
+                        "parent_heading": r.parent_heading,
+                    }
+                    for r in results
+                ],
+            )
+        except Exception:  # noqa: BLE001
+            pass
     return results
 
 

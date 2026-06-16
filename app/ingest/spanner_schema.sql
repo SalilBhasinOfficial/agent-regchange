@@ -143,3 +143,33 @@ CREATE TABLE pipeline_runs (
 ) PRIMARY KEY (pipeline_run_id);
 
 CREATE INDEX pipeline_runs_by_ts ON pipeline_runs (ts DESC);
+
+-- ---------------------------------------------------------------------------
+-- parsed_chunks — Doc AI parse cache, keyed on the PDF's sha256. A re-run of
+-- the same document (or the same Master Direction reused across amendments)
+-- skips the slow, paid Doc AI re-parse. chunk_gz is gzipped JSON of the
+-- ChunkedSection list; chunk_id is re-derived from the current doc_id on read.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS parsed_chunks (
+  pdf_sha256  STRING(64) NOT NULL,
+  doc_id      STRING(MAX),
+  n_chunks    INT64,
+  page_count  INT64,
+  chunk_b64   STRING(MAX),                         -- base64(gzip(JSON(list[ChunkedSection])))
+  parsed_at   TIMESTAMP OPTIONS (allow_commit_timestamp=true),
+) PRIMARY KEY (pdf_sha256);
+
+-- ---------------------------------------------------------------------------
+-- run_checkpoints — partial chain state for resume. Keyed on a content hash of
+-- the inputs (both PDFs + namespace). Written after each chain stage; cleared
+-- on successful completion, so only a failed/stuck run leaves a resumable
+-- checkpoint. state_gz is gzip(AgentState.model_dump_json()); stages is a
+-- comma-separated set of completed stage names.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS run_checkpoints (
+  resume_key       STRING(64) NOT NULL,
+  stages           STRING(MAX),                    -- "ingested,param_diff,decompose,..."
+  state_b64        STRING(MAX),                     -- base64(gzip(AgentState.model_dump_json()))
+  pipeline_run_id  STRING(MAX),
+  updated_at       TIMESTAMP OPTIONS (allow_commit_timestamp=true),
+) PRIMARY KEY (resume_key);

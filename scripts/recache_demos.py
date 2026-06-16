@@ -21,7 +21,11 @@ def run_one(demo: dict) -> None:
     pdf_b = _FIXT / demo["doc_b"]
     print(f"\n=== {demo['id']}: {pdf_a.name}  vs  {pdf_b.name} ===")
     run_id = launch_chain_run(
-        pdf_a, pdf_b, namespace="capital-adequacy", amendment_id=demo["id"]
+        pdf_a,
+        pdf_b,
+        namespace="capital-adequacy",
+        amendment_id=demo["id"],
+        resume=False,  # demo re-caching must run fresh to pick up code changes
     )
     print(f"run_id={run_id}  polling…")
     t0 = time.monotonic()

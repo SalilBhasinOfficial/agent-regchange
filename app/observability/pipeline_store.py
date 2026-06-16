@@ -20,11 +20,18 @@ gracefully to "Run not found" rather than 500-ing.
 
 from __future__ import annotations
 
+import base64
+import gzip
+import json
 import logging
 import os
 from typing import Any
 
 LOGGER = logging.getLogger(__name__)
+
+# Spanner STRING(MAX)/BYTES(MAX) hard cap is ~2.5 MiB per value. Compressed
+# payloads (parse cache, run checkpoints) are guarded against it.
+_BLOB_LIMIT = 2_500_000
 
 ENV_PROJECT = "GOOGLE_CLOUD_PROJECT"
 ENV_INSTANCE = "SPANNER_INSTANCE"
@@ -381,10 +388,190 @@ def _int_param_types(name: str) -> dict[str, Any]:
     return {name: spanner.param_types.INT64}
 
 
+# ---------------------------------------------------------------------------
+# Doc AI parse cache — key on the PDF's sha256 so a re-run (or the same master
+# direction reused across amendments) skips the slow/paid Doc AI re-parse.
+# Stores the parsed chunks as gzipped JSON. Best-effort: any failure falls back
+# to a live parse.
+# ---------------------------------------------------------------------------
+
+
+def parse_cache_get(pdf_sha256: str) -> list[dict] | None:
+    """Return cached parsed-chunk dicts for a PDF sha256, or None on miss."""
+    database = _get_database()
+    if database is None:
+        return None
+    try:
+        with database.snapshot() as snap:
+            rows = list(
+                snap.execute_sql(
+                    "SELECT chunk_b64 FROM parsed_chunks WHERE pdf_sha256=@h",
+                    params={"h": pdf_sha256},
+                    param_types=_string_param_types("h"),
+                )
+            )
+        if not rows or rows[0][0] is None:
+            return None
+        return json.loads(gzip.decompress(base64.b64decode(rows[0][0])).decode("utf-8"))
+    except Exception as e:  # noqa: BLE001
+        LOGGER.warning("parse_cache_get failed (%s): %s", pdf_sha256[:12], e)
+        return None
+
+
+def parse_cache_put(
+    pdf_sha256: str, doc_id: str, page_count: int, chunk_dicts: list[dict]
+) -> None:
+    """Store parsed-chunk dicts under a PDF sha256. Best-effort, no raise."""
+    database = _get_database()
+    if database is None:
+        return
+    try:
+        blob = base64.b64encode(
+            gzip.compress(json.dumps(chunk_dicts, default=str).encode("utf-8"))
+        ).decode("ascii")
+        if len(blob) > _BLOB_LIMIT:
+            LOGGER.warning(
+                "parse_cache_put skipped — gzip %d > limit (%s)", len(blob), pdf_sha256[:12]
+            )
+            return
+        from google.cloud import spanner  # type: ignore[import-not-found]
+
+        def _txn(transaction) -> None:
+            transaction.insert_or_update(
+                table="parsed_chunks",
+                columns=(
+                    "pdf_sha256",
+                    "doc_id",
+                    "n_chunks",
+                    "page_count",
+                    "chunk_b64",
+                    "parsed_at",
+                ),
+                values=[
+                    (
+                        pdf_sha256,
+                        doc_id,
+                        len(chunk_dicts),
+                        page_count,
+                        blob,
+                        spanner.COMMIT_TIMESTAMP,
+                    )
+                ],
+            )
+
+        database.run_in_transaction(_txn)
+    except Exception as e:  # noqa: BLE001
+        LOGGER.warning("parse_cache_put failed (%s): %s", pdf_sha256[:12], e)
+
+
+# ---------------------------------------------------------------------------
+# Run checkpoints — persist partial chain state keyed on a content hash of the
+# inputs so a failed/stuck run can be resumed past already-completed stages.
+# Cleared on successful completion (so only failed runs leave a resumable
+# checkpoint). state is gzipped to fit the column limit without trimming.
+# ---------------------------------------------------------------------------
+
+
+def load_run_checkpoint(resume_key: str) -> dict | None:
+    """Return {stages: list[str], state_json: str, pipeline_run_id} or None."""
+    database = _get_database()
+    if database is None:
+        return None
+    try:
+        with database.snapshot() as snap:
+            rows = list(
+                snap.execute_sql(
+                    "SELECT stages, state_b64, pipeline_run_id "
+                    "FROM run_checkpoints WHERE resume_key=@k",
+                    params={"k": resume_key},
+                    param_types=_string_param_types("k"),
+                )
+            )
+        if not rows or rows[0][1] is None:
+            return None
+        stages_csv, state_b64, prid = rows[0]
+        return {
+            "stages": [s for s in (stages_csv or "").split(",") if s],
+            "state_json": gzip.decompress(base64.b64decode(state_b64)).decode("utf-8"),
+            "pipeline_run_id": prid,
+        }
+    except Exception as e:  # noqa: BLE001
+        LOGGER.warning("load_run_checkpoint failed (%s): %s", resume_key[:12], e)
+        return None
+
+
+def save_run_checkpoint(
+    resume_key: str, stages: list[str], state_json: str, pipeline_run_id: str
+) -> None:
+    """Persist partial state for a resume_key after a stage. Best-effort."""
+    database = _get_database()
+    if database is None:
+        return
+    try:
+        blob = base64.b64encode(gzip.compress(state_json.encode("utf-8"))).decode("ascii")
+        if len(blob) > _BLOB_LIMIT:
+            LOGGER.warning(
+                "save_run_checkpoint skipped — gzip %d > limit (%s)",
+                len(blob),
+                resume_key[:12],
+            )
+            return
+        from google.cloud import spanner  # type: ignore[import-not-found]
+
+        def _txn(transaction) -> None:
+            transaction.insert_or_update(
+                table="run_checkpoints",
+                columns=(
+                    "resume_key",
+                    "stages",
+                    "state_b64",
+                    "pipeline_run_id",
+                    "updated_at",
+                ),
+                values=[
+                    (
+                        resume_key,
+                        ",".join(stages),
+                        blob,
+                        pipeline_run_id,
+                        spanner.COMMIT_TIMESTAMP,
+                    )
+                ],
+            )
+
+        database.run_in_transaction(_txn)
+    except Exception as e:  # noqa: BLE001
+        LOGGER.warning("save_run_checkpoint failed (%s): %s", resume_key[:12], e)
+
+
+def clear_run_checkpoint(resume_key: str) -> None:
+    """Delete a run checkpoint (called on successful completion). Best-effort."""
+    database = _get_database()
+    if database is None:
+        return
+    try:
+
+        def _txn(transaction) -> None:
+            transaction.execute_update(
+                "DELETE FROM run_checkpoints WHERE resume_key=@k",
+                params={"k": resume_key},
+                param_types=_string_param_types("k"),
+            )
+
+        database.run_in_transaction(_txn)
+    except Exception as e:  # noqa: BLE001
+        LOGGER.warning("clear_run_checkpoint failed (%s): %s", resume_key[:12], e)
+
+
 __all__ = [
     "save_pipeline_run",
     "load_pipeline_run",
     "latest_done_run",
     "cost_summary",
     "stage_breakdown",
+    "parse_cache_get",
+    "parse_cache_put",
+    "load_run_checkpoint",
+    "save_run_checkpoint",
+    "clear_run_checkpoint",
 ]

@@ -174,18 +174,45 @@ def home(request: Request) -> HTMLResponse:
     return templates.TemplateResponse("upload.html", {"request": request})
 
 
+def _resume_key(pdf_a_path: Path, pdf_b_path: Path, namespace: str) -> str | None:
+    """Stable content hash of the inputs, used to resume a failed run.
+
+    Keyed on both PDFs' bytes + namespace so re-running the SAME comparison
+    finds the prior run's checkpoint; a different document pair gets a fresh
+    key. Returns None if the files can't be read.
+    """
+    import hashlib
+
+    try:
+        h = hashlib.sha256()
+        h.update(pdf_a_path.read_bytes())
+        h.update(b"\x00")
+        h.update(pdf_b_path.read_bytes())
+        h.update(b"\x00")
+        h.update(namespace.encode("utf-8"))
+        return h.hexdigest()
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def launch_chain_run(
     pdf_a_path: Path,
     pdf_b_path: Path,
     *,
     namespace: str = "demo",
     amendment_id: str | None = None,
+    resume: bool = True,
 ) -> str:
     """Kick off the full chain on a PDF pair in a background thread.
 
     Shared by the upload route (``/analyse``) and the curated demos
     (``/demos/{id}/run``). Returns the ``pipeline_run_id`` immediately;
     the caller polls ``/analyse/{id}/status``.
+
+    When ``resume`` is True (default) and a prior run of the SAME inputs failed
+    partway, the chain resumes past already-completed stages using the persisted
+    checkpoint. Pass ``resume=False`` to always run fresh (e.g. demo re-caching
+    that must pick up code changes).
     """
     from app.observability.run_log import begin_pipeline_run
 
@@ -223,47 +250,99 @@ def launch_chain_run(
             # workers in map/diff/lens panels) is tagged with the id the
             # user/UI sees (B2 fix, 2026-06-05).
             bind_pipeline_run(pipeline_run_id)
-            with _RUNS_LOCK:
-                _RUNS[pipeline_run_id]["status"] = "ingesting"
 
-            # Ingest both PDFs (dry_run=False persists to Spanner if configured).
+            # --- Resume support --------------------------------------------
+            # If a prior run of the SAME inputs failed partway, load its
+            # checkpoint and skip already-completed stages. Only failed runs
+            # leave a checkpoint (cleared on success). Best-effort: any issue
+            # just runs fresh. Disable with CURATOR_RUN_CHECKPOINT=0 or
+            # resume=False (demo re-caching passes resume=False to run fresh).
             grounding_mode = os.environ.get("CURATOR_GROUNDING", "mock")
-            state = ingest_two_pdfs(
-                pdf_a_path,
-                pdf_b_path,
-                namespace=namespace,
-                dry_run=(grounding_mode != "spanner"),
+            _ckpt_on = (
+                resume
+                and grounding_mode == "spanner"
+                and os.environ.get("CURATOR_RUN_CHECKPOINT", "1") != "0"
             )
+            _rkey = _resume_key(pdf_a_path, pdf_b_path, namespace) if _ckpt_on else None
+            _done: set[str] = set()
+            state = None
+            if _rkey:
+                try:
+                    from app.models import AgentState as _AgentState
+                    from app.observability.pipeline_store import load_run_checkpoint
 
-            _t_ingest = _time.monotonic()
-            # Full document is ingested + persisted to Spanner above. In
-            # fast-mode the debate panel processes a bounded sample of the
-            # amended clauses so an interactive/cached demo stays snappy;
-            # "re-run live" (CURATOR_FAST_MODE unset) decomposes them all.
-            _clauses_total = len(state.amended_clauses)
-            # Pre-diff clause filter: drop clauses byte-identical to the prior
-            # document before the per-clause four-lens fan-out (~4 LLM calls
-            # each). Exact-match only — any numeric change survives. Runs ahead
-            # of the fast-mode cap. Disable with CURATOR_PREDIFF_FILTER_CLAUSES=0.
-            if os.environ.get("CURATOR_PREDIFF_FILTER_CLAUSES", "1") != "0":
-                from app.ingest.prediff import filter_unchanged_clauses
+                    _ck = load_run_checkpoint(_rkey)
+                    if _ck and _ck.get("state_json"):
+                        state = _AgentState.model_validate_json(_ck["state_json"])
+                        _done = set(_ck.get("stages") or [])
+                        import logging as _lg
 
-                _kept, _dropped = filter_unchanged_clauses(
-                    state.amended_clauses, state.comparison_text
+                        _lg.getLogger(__name__).info(
+                            "resume: checkpoint for %s — skipping completed stages %s",
+                            pipeline_run_id,
+                            sorted(_done),
+                        )
+                except Exception:  # noqa: BLE001
+                    state, _done = None, set()
+
+            def _checkpoint(stage: str) -> None:
+                _done.add(stage)
+                if _rkey and state is not None:
+                    try:
+                        from app.observability.pipeline_store import save_run_checkpoint
+
+                        save_run_checkpoint(
+                            _rkey, sorted(_done), state.model_dump_json(), pipeline_run_id
+                        )
+                    except Exception:  # noqa: BLE001
+                        pass
+
+            if "ingested" not in _done or state is None:
+                with _RUNS_LOCK:
+                    _RUNS[pipeline_run_id]["status"] = "ingesting"
+
+                # Ingest both PDFs (dry_run=False persists to Spanner if configured).
+                state = ingest_two_pdfs(
+                    pdf_a_path,
+                    pdf_b_path,
+                    namespace=namespace,
+                    dry_run=(grounding_mode != "spanner"),
                 )
-                # Guard: never let the filter empty the clause set — a doc that
-                # is byte-identical to its prior (re-issue) or whose only clause
-                # matches the prior would otherwise cascade to a "0 of
-                # everything" page. Keep at least the original clauses if the
-                # filter would drop them all.
-                if _dropped and _kept:
-                    state.amended_clauses = _kept
-            _fast_clauses = os.environ.get("CURATOR_FAST_MODE", "0").strip().lower() in {
-                "1", "true", "yes", "on"
-            }
-            _clause_cap = int(os.environ.get("CURATOR_FAST_MAX_CLAUSES", "10"))
-            if _fast_clauses and len(state.amended_clauses) > _clause_cap:
-                state.amended_clauses = state.amended_clauses[:_clause_cap]
+
+                _t_ingest = _time.monotonic()
+                # Full document is ingested + persisted to Spanner above. In
+                # fast-mode the debate panel processes a bounded sample of the
+                # amended clauses so an interactive/cached demo stays snappy;
+                # "re-run live" (CURATOR_FAST_MODE unset) decomposes them all.
+                _clauses_total = len(state.amended_clauses)
+                # Pre-diff clause filter: drop clauses byte-identical to the prior
+                # document before the per-clause four-lens fan-out (~4 LLM calls
+                # each). Exact-match only — any numeric change survives. Runs ahead
+                # of the fast-mode cap. Disable with CURATOR_PREDIFF_FILTER_CLAUSES=0.
+                if os.environ.get("CURATOR_PREDIFF_FILTER_CLAUSES", "1") != "0":
+                    from app.ingest.prediff import filter_unchanged_clauses
+
+                    _kept, _dropped = filter_unchanged_clauses(
+                        state.amended_clauses, state.comparison_text
+                    )
+                    # Guard: never let the filter empty the clause set — a doc that
+                    # is byte-identical to its prior (re-issue) or whose only clause
+                    # matches the prior would otherwise cascade to a "0 of
+                    # everything" page. Keep at least the original clauses if the
+                    # filter would drop them all.
+                    if _dropped and _kept:
+                        state.amended_clauses = _kept
+                _fast_clauses = os.environ.get("CURATOR_FAST_MODE", "0").strip().lower() in {
+                    "1", "true", "yes", "on"
+                }
+                _clause_cap = int(os.environ.get("CURATOR_FAST_MAX_CLAUSES", "10"))
+                if _fast_clauses and len(state.amended_clauses) > _clause_cap:
+                    state.amended_clauses = state.amended_clauses[:_clause_cap]
+                _checkpoint("ingested")
+            else:
+                # Resumed past ingest — state restored from checkpoint.
+                _t_ingest = _time.monotonic()
+                _clauses_total = len(state.amended_clauses)
             with _RUNS_LOCK:
                 _RUNS[pipeline_run_id]["clauses_count"] = len(state.amended_clauses)
                 _RUNS[pipeline_run_id]["clauses_total"] = _clauses_total
@@ -292,33 +371,47 @@ def launch_chain_run(
                 from app.sub_agents.map_ import real_map
                 from app.sub_agents.param_diff import real_param_diff
 
-                # Parameter-diff: the quantitative old→new comparison between
-                # the two frameworks (Doc A new vs Doc B prior). This is the
-                # core change-analysis output — runs even in fast-mode since
-                # it is a single large-context call, not a per-clause fan-out.
-                state.param_changes = real_param_diff(
-                    state.amended_clauses,
-                    new_title=state.amendment.title,
-                    new_text=state.amendment.raw_text,
-                    comparison_title=state.comparison_title,
-                    comparison_text=state.comparison_text,
-                )
-                state.obligations = real_decompose(state.amended_clauses)
-                # CURATOR_FAST_MODE caps obligation fan-out before the
-                # map/diff/judge tail so an interactive demo finishes
-                # quickly under free-tier Vertex quota. Full panel remains
-                # the default when the flag is unset.
-                _fast = os.environ.get("CURATOR_FAST_MODE", "0").strip().lower() in {
-                    "1", "true", "yes", "on"
-                }
-                _cap = int(os.environ.get("CURATOR_FAST_MAX_OBLIGATIONS", "5"))
-                if _fast and len(state.obligations) > _cap:
-                    state.obligations = state.obligations[:_cap]
-                state.matches = real_map(state.obligations, state.policies)
-                state.diffs = real_diff(state.matches, state.obligations, state.policies)
-                state.impact = real_judge(
-                    state.obligations, state.matches, state.diffs, state.param_changes
-                )
+                # Each stage is checkpointed so a failure resumes past it on
+                # retry (see _checkpoint / resume support above).
+                if "param_diff" not in _done:
+                    # Parameter-diff: the quantitative old→new comparison between
+                    # the two frameworks (Doc A new vs Doc B prior). This is the
+                    # core change-analysis output — runs even in fast-mode since
+                    # it is a single large-context call, not a per-clause fan-out.
+                    state.param_changes = real_param_diff(
+                        state.amended_clauses,
+                        new_title=state.amendment.title,
+                        new_text=state.amendment.raw_text,
+                        comparison_title=state.comparison_title,
+                        comparison_text=state.comparison_text,
+                    )
+                    _checkpoint("param_diff")
+                if "decompose" not in _done:
+                    state.obligations = real_decompose(state.amended_clauses)
+                    # CURATOR_FAST_MODE caps obligation fan-out before the
+                    # map/diff/judge tail so an interactive demo finishes
+                    # quickly under free-tier Vertex quota. Full panel remains
+                    # the default when the flag is unset.
+                    _fast = os.environ.get("CURATOR_FAST_MODE", "0").strip().lower() in {
+                        "1", "true", "yes", "on"
+                    }
+                    _cap = int(os.environ.get("CURATOR_FAST_MAX_OBLIGATIONS", "5"))
+                    if _fast and len(state.obligations) > _cap:
+                        state.obligations = state.obligations[:_cap]
+                    _checkpoint("decompose")
+                if "map" not in _done:
+                    state.matches = real_map(state.obligations, state.policies)
+                    _checkpoint("map")
+                if "diff" not in _done:
+                    state.diffs = real_diff(
+                        state.matches, state.obligations, state.policies
+                    )
+                    _checkpoint("diff")
+                if "judge" not in _done:
+                    state.impact = real_judge(
+                        state.obligations, state.matches, state.diffs, state.param_changes
+                    )
+                    _checkpoint("judge")
                 # Compliance + internal-audit gate, with findings looped back to
                 # finalize the report (true-and-fair) and a re-audit to confirm.
                 try:
@@ -336,7 +429,9 @@ def launch_chain_run(
                         )
                     except Exception:  # noqa: BLE001
                         pass
-                    review_and_finalize(state)
+                    if "audit" not in _done:
+                        review_and_finalize(state)
+                        _checkpoint("audit")
                     try:
                         _prog.bump()
                     except Exception:  # noqa: BLE001
@@ -366,6 +461,15 @@ def launch_chain_run(
             with _RUNS_LOCK:
                 _RUNS[pipeline_run_id]["state"] = state
                 _RUNS[pipeline_run_id]["status"] = "done"
+            # Run completed — drop the resume checkpoint so a future run of the
+            # same inputs starts fresh (only failed runs stay resumable).
+            if _rkey:
+                try:
+                    from app.observability.pipeline_store import clear_run_checkpoint
+
+                    clear_run_checkpoint(_rkey)
+                except Exception:  # noqa: BLE001
+                    pass
             # Performance stats for the /stats endpoint + impact panel.
             import json as _json
             from app.llm import curator_model_name
